@@ -25,16 +25,17 @@
     </head>
     <body>
       <div class="container">
-        	<center><iframe width="1080" height="720" src="https://cheroga.github.io/video.webm" frameborder="0" allowfullscreen></iframe></center>
+        	<center><iframe width="100%" height="100%" src="https://cheroga.github.io/video.webm" frameborder="0" allowfullscreen></iframe></center>
 	      </div>
-      <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-      <script src="jquery.fitvids.js"></script>
+      <script  src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+      <script src="http://mensajerofm.org/app/cheroga.org/jquery.fitvids.js"></script>
       <script>
         // Basic FitVids Test
         $(".container").fitVids();
         // Custom selector and No-Double-Wrapping Prevention Test
-        $(".container").fitVids({ customSelector: "iframe[src^='https://cheroga.github.io']"});
+        $(".container").fitVids({ customSelector: "iframe[src^='http://socialcam.com']"});
 		$('video').trigger('play');
+$('.container').trigger('play');
       </script>
       </body>
   </html>
