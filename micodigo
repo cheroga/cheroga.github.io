@@ -1,0 +1,1624 @@
+package com.moisnostudio.jerutiapp
+
+import android.annotation.SuppressLint
+import android.app.DownloadManager
+import android.os.Bundle
+import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import android.widget.Toast
+import androidx.annotation.OptIn
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ktx.database
+import com.moisnostudio.jerutiapp.model.CategoriaConCanales
+import com.moisnostudio.jerutiapp.model.Sample
+import com.moisnostudio.jerutiapp.ui.MainVerticalAdapter
+import kotlinx.coroutines.launch
+import android.content.Intent
+import android.net.Uri
+import android.widget.ImageButton
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.recyclerview.widget.GridLayoutManager
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.remoteconfig.ktx.remoteConfig
+import com.google.firebase.remoteconfig.ktx.remoteConfigSettings
+import com.moisnostudio.jerutiapp.model.ServidorIPTV
+import okhttp3.Request
+import okhttp3.OkHttpClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import android.util.Log
+import com.moisnostudio.jerutiapp.network.RetrofitClient
+import java.io.File
+import kotlinx.coroutines.*
+import org.json.JSONArray
+import org.json.JSONObject
+import com.moisnostudio.jerutiapp.model.IptvData // Verifica que sea el nombre correcto
+import com.moisnostudio.jerutiapp.ui.ServidoresAdapter
+
+
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var player: ExoPlayer
+    private var ultimaPosicionCanal: Int = 0 // Variable para recordar el canal
+    private lateinit var playerView: PlayerView
+    private lateinit var rvCanales: RecyclerView
+    private lateinit var layoutError: LinearLayout
+    private lateinit var txtMensajeError: TextView
+    private lateinit var progressBar: ProgressBar
+    private lateinit var layoutInfoCanal: LinearLayout
+    private lateinit var txtNombreCanalInfo: TextView
+    private lateinit var imgLogoCanalInfo: ImageView
+    private lateinit var imgFondoInicio: ImageView
+    private var vistaUltimoCanal: View? = null
+    private val client = OkHttpClient()
+    // ... tus otras variables como player, rvCanales, etc.
+    private lateinit var database: DatabaseReference
+    // Busca donde declaraste la variable al principio de la clase y ponla así:
+    private val listaServidores = mutableListOf<ServidorIPTV>()
+
+
+
+    @OptIn(UnstableApi::class)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        checkForUpdates()
+        vincularVistas()
+        escucharServidoresFirebase()
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
+        setupRecyclerView()
+        setupPlayer()
+        //mostrarSelectorDeServidor()
+        rvCanales.setItemViewCacheSize(50)
+
+    }
+
+    fun checkForUpdates() {
+        val remoteConfig = Firebase.remoteConfig
+
+        // Configuración de intervalo de escaneo
+        val configSettings = remoteConfigSettings {
+            minimumFetchIntervalInSeconds = 3600
+        }
+        remoteConfig.setConfigSettingsAsync(configSettings)
+
+        // Traer los datos del servidor
+        remoteConfig.fetchAndActivate().addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                val lastVersionCode = remoteConfig.getLong("last_version_code")
+                val updateUrl = remoteConfig.getString("update_url")
+
+                // --- OBTENER VERSIÓN ACTUAL SIN USAR BUILDCONFIG ---
+                val currentVersionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    packageManager.getPackageInfo(packageName, 0).longVersionCode
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
+                }
+
+                // Comparar con la versión instalada
+                if (lastVersionCode > currentVersionCode) {
+                    showUpdateDialog(updateUrl)
+                }
+            }
+        }
+    }
+
+
+    private fun showUpdateDialog(url: String) {
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Actualización Disponible")
+            .setMessage("Para seguir usando la app, debes instalar la última versión.")
+            .setCancelable(false) // Bloquea clics fuera y botón atrás
+            .setPositiveButton("Actualizar ahora", null) // Ponemos null para controlar el clic manualmente
+
+        val dialog = builder.create()
+        dialog.show()
+
+        // Configuramos el clic así para que el diálogo no se cierre al presionar
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false // Deshabilitar para evitar múltiples clics
+            downloadAndInstall(url, dialog)
+        }
+    }
+
+    @SuppressLint("Range")
+    private fun downloadAndInstall(url: String, dialog: AlertDialog) {
+        // 1. LIMPIEZA: Borrar APKs viejos para no llenar la TV Box
+        externalCacheDir?.listFiles()?.forEach { file ->
+            if (file.name.startsWith("update") && file.name.endsWith(".apk")) {
+                file.delete()
+            }
+        }
+
+        // 2. NUEVO NOMBRE: Usamos timestamp para que el DownloadManager no se bloquee
+        val destination = File(externalCacheDir, "update_${System.currentTimeMillis()}.apk")
+
+        val manager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
+        val request = DownloadManager.Request(Uri.parse(url))
+            .setTitle("Descargando actualización...")
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            .setDestinationUri(Uri.fromFile(destination))
+
+        val downloadId = manager.enqueue(request)
+
+        // 3. PROGRESO: Corrutina para actualizar el diálogo en tiempo real
+        lifecycleScope.launch {
+            var downloading = true
+            while (downloading) {
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                val cursor = manager.query(query)
+                if (cursor != null && cursor.moveToFirst()) {
+                    @SuppressLint("Range")
+                    val bytesDownloaded = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                    @SuppressLint("Range")
+                    val bytesTotal = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+
+                    if (bytesTotal > 0) {
+                        val progress = (bytesDownloaded * 100L / bytesTotal)
+                        // Actualizamos el mensaje del diálogo que ya está visible
+                        dialog.setMessage("Descargando: $progress% (${bytesDownloaded / 1024} KB / ${bytesTotal / 1024} KB)")
+                    }
+
+                    @SuppressLint("Range")
+                    val status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS))
+                    when (status) {
+                        DownloadManager.STATUS_SUCCESSFUL -> {
+                            downloading = false
+                            installApk(destination)
+                            dialog.dismiss() // Cerramos el diálogo al terminar
+                        }
+                        DownloadManager.STATUS_FAILED -> {
+                            downloading = false
+                            dialog.setMessage("Error en la descarga. Intenta de nuevo.")
+                            dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = true
+                        }
+                    }
+                    cursor.close()
+                }
+                delay(500) // Revisa el estado cada medio segundo
+            }
+        }
+    }
+
+    private fun installApk(file: java.io.File) {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            this, "$packageName.fileprovider", file
+        )
+        val intent = Intent(Intent.ACTION_VIEW)
+        intent.setDataAndType(uri, "application/vnd.android.package-archive")
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
+    }
+
+    private fun escucharServidoresFirebase() {
+        val database = com.google.firebase.ktx.Firebase.database.reference.child("servidores")
+
+        database.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                val eraListaVacia = listaServidores.isEmpty()
+                listaServidores.clear()
+
+                for (data in snapshot.children) {
+                    val srv = data.getValue(ServidorIPTV::class.java)
+                    srv?.let { listaServidores.add(it) }
+                }
+
+                if (eraListaVacia && listaServidores.isNotEmpty()) {
+                    mostrarSelectorDeServidor()
+                }
+            }
+
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                Toast.makeText(this@MainActivity, "Error Firebase: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+    private fun vincularVistas() {
+        imgFondoInicio = findViewById(R.id.imgFondoInicio) // Agregado
+        layoutInfoCanal = findViewById(R.id.layoutInfoCanal)
+        txtNombreCanalInfo = findViewById(R.id.txtNombreCanalInfo)
+        imgLogoCanalInfo = findViewById(R.id.imgLogoCanalInfo)
+        playerView = findViewById(R.id.playerView)
+        rvCanales = findViewById(R.id.rvCanales)
+        progressBar = findViewById(R.id.progressBar)
+        layoutError = findViewById(R.id.layoutError)
+        txtMensajeError = findViewById(R.id.txtMensajeError)
+    }
+    private fun setupRecyclerView(listaCategorias: List<CategoriaConCanales> = emptyList()) {
+        // 1. Configuración física del RecyclerView (Tu código actual)
+        rvCanales.layoutManager = null
+        val layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
+        rvCanales.layoutManager = layoutManager
+
+        // IMPORTANTE: Si la lista está vacía, no asignes el adapter todavía o usa una lista vacía oficial
+        val mainAdapter = MainVerticalAdapter(listaCategorias) { canal ->
+
+        val urlSegura = canal.url ?: ""
+
+            if (urlSegura.contains(".m3u8") || urlSegura.contains(".ts")) {
+                android.util.Log.d("RASTREO", "Reproducción Directa (M3U): ${canal.name}")
+
+                // 2. USAR LA VARIABLE SEGURA AQUÍ (Sin los !!)
+                prepararMotorYReproducir(
+                    url = urlSegura,  // <-- Cambiado: usamos la variable que ya validamos
+                    drmUri = null,
+                    type = null,
+                    headers = canal.headersUrl
+                )
+            } else {
+                android.util.Log.d("RASTREO", "Iniciando Captura WebView: ${canal.name}")
+
+                // Si es una web (StreamEast, etc.), usamos el capturador habitual
+                extraerUrlDeWebView(canal)
+            }
+
+        }
+
+        // 3. Asignar el adaptador
+        rvCanales.adapter = mainAdapter
+        // Esto obliga al RecyclerView a calcular los espacios de nuevo
+        mainAdapter.notifyDataSetChanged()
+        rvCanales.scheduleLayoutAnimation()
+    }
+    private fun mostrarSelectorDeServidor() {
+        val dialogView = layoutInflater.inflate(R.layout.layout_selector_servidores, null)
+        val rvSelector = dialogView.findViewById<RecyclerView>(R.id.rvSelectorServidores)
+
+        val dialog = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_NoActionBar_Fullscreen)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        // --- EL TRUCO PARA EL BOTÓN ATRÁS ---
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                // Si presiona atrás en el selector, mostramos el diálogo de salir
+                mostrarDialogoSalir()
+                true // Confirmamos que manejamos nosotros el evento
+            } else {
+                false
+            }
+        }
+
+        rvSelector.layoutManager = GridLayoutManager(this, 2)
+        rvSelector.adapter = ServidoresAdapter(listaServidores.toList()) { servidor ->
+            cargarCanales(servidor.url)
+            dialog.dismiss()
+        }
+
+        dialog.show()
+
+        // Foco inicial para que el control remoto funcione de una
+        rvSelector.post { rvSelector.requestFocus() }
+    }
+//nuevo m3u
+private fun procesarM3U(contenido: String): List<Sample> {
+    val lista = mutableListOf<Sample>()
+    val lineas = contenido.lines()
+    var nombreActual = ""
+    var tvgIdActual = ""
+    var refererActual: String? = null
+
+    for (linea in lineas) {
+        val l = linea.trim()
+        when {
+            l.startsWith("#EXTINF") -> {
+                nombreActual = l.substringAfterLast(",").trim()
+                tvgIdActual = l.substringAfter("tvg-id=\"", "").substringBefore("\"", "")
+            }
+            l.startsWith("#EXTVLCOPT:http-referrer=") -> {
+                refererActual = l.substringAfter("=").trim()
+            }
+            l.startsWith("http") -> {
+                // Mapeamos el Referer a headersUrl para que el motor lo use
+                val headers = if (refererActual != null) mapOf("Referer" to refererActual) else null
+
+                lista.add(Sample(
+                    name = nombreActual,
+                    url = l,
+                    headersUrl = headers,
+                    icono = "https://cheroga.github.io/jejru2.png" // Puedes poner un logo por defecto
+                ))
+                refererActual = null
+            }
+        }
+    }
+    return lista
+}
+    // Asegúrate de que devuelva List<Sample>
+    private fun parseJson(jsonString: String): List<Sample> {
+        val lista = mutableListOf<Sample>()
+        try {
+            // 1. Intentamos leerlo como un Array directo [{}, {}]
+            val array = if (jsonString.trim().startsWith("[")) {
+                JSONArray(jsonString)
+            } else {
+                // 2. Si viene envuelto en un objeto {"samples": []} o {"canales": []}
+                val root = JSONObject(jsonString)
+                root.optJSONArray("samples") ?: root.optJSONArray("canales") ?: JSONArray()
+            }
+
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                lista.add(Sample(
+                    name = obj.optString("name"),
+                    url = obj.optString("url"),
+                    icono = obj.optString("icono"),
+                    type = obj.optString("type", "PELICULA"),
+
+                    // --- CAMPOS PARA EXPERIENCIA NETFLIX ---
+                    descripcion = obj.optString("descripcion"),
+                    anio = obj.optString("anio"),
+                    duracion = obj.optString("duracion"),
+                    genero = obj.optString("genero"),
+                ))
+            }
+        } catch (e: Exception) {
+            Log.e("JSON_ERROR", "Error crítico: ${e.message}")
+        }
+        return lista
+    }
+
+
+    private fun actualizarInterfaz(listaCategorias: List<CategoriaConCanales>) {
+        val mainAdapter = MainVerticalAdapter(listaCategorias) { canal ->
+
+            // 1. Detectamos si es una Película primero
+            if (canal.type?.uppercase() == "PELICULA") {
+                Log.d("RASTREO", "Abriendo Detalles de Película: ${canal.name}")
+                abrirDetallesPelicula(canal) // Función que crearemos abajo
+                return@MainVerticalAdapter // Salimos para no ejecutar lo de los canales
+            }
+
+            // 2. Si no es película, seguimos con tu lógica original para canales
+            val url = canal.url?.lowercase() ?: ""
+
+            when {
+                // Caso A: Canales con extensiones directas
+                url.contains(".m3u8") || url.contains(".ts") || url.contains(".mpd") -> {
+                    Log.d("RASTREO", "Reproducción directa/DRM: ${canal.name}")
+                    // Pasamos todos los parámetros para que CLEARKEY siga funcionando
+                    prepararMotorYReproducir(
+                        canal.url!!,
+                        canal.drm_license_uri,
+                        canal.type,
+                        canal.headersUrl
+                    )
+                }
+                // Caso B: Todo lo demás (Webview / Páginas de deportes)
+                else -> {
+                    Log.d("RASTREO", "Iniciando WebView: ${canal.name}")
+                    extraerUrlDeWebView(canal)
+                }
+            }
+        }
+
+        rvCanales.adapter = mainAdapter
+    }
+    // --- NUEVA FUNCIÓN DE NAVEGACIÓN PARA VOD ---
+    private fun abrirDetallesPelicula(peli: Sample) {
+        val intent = Intent(this, DetallesPeliculaActivity::class.java).apply {
+            putExtra("Pelicula_Nombre", peli.name)
+            putExtra("Pelicula_Desc", peli.descripcion)
+            putExtra("Pelicula_Url", peli.url)
+            putExtra("Pelicula_Anio", peli.anio)
+            putExtra("Pelicula_Duracion", peli.duracion)
+            putExtra("Pelicula_Genero", peli.genero)
+        }
+        startActivity(intent)
+    }
+
+    // Dentro de tu lógica de carga de Firebase/Servidor
+    private fun cargarLista(url: String) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val request = Request.Builder().url(url).build()
+
+                // Usamos .execute() dentro de un bloque 'use' para que la respuesta se cierre sola
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw java.io.IOException("Error: $response")
+
+                    // IMPORTANTE: body no lleva paréntesis, string() sí.
+                    val content = response.body()?.string() ?: ""
+
+                    withContext(Dispatchers.Main) {
+                        val canalesExtraidos = if (url.contains(".m3u") || content.contains("#EXTM3U")) {
+                            procesarM3U(content)
+                        } else {
+                            parseJson(content)
+                        }
+
+                        val titulo = if (url.contains("py.m3u")) "Canales de Paraguay" else "Lista de Canales"
+                        val nuevaCategoria = CategoriaConCanales(titulo, canalesExtraidos)
+                        actualizarInterfaz(listOf(nuevaCategoria))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ERROR_CARGA", "Error en body: ${e.message}")
+            }
+        }
+    }
+    private suspend fun actualizarUIConCategorias(listas: List<CategoriaConCanales>) {
+        withContext(Dispatchers.Main) {
+            if (listas.isNotEmpty()) {
+                setupRecyclerView(listas)
+                finalizarCargaExitosa()
+            } else {
+                manejarErrorCarga("No se encontraron contenidos")
+            }
+        }
+    }
+    private fun cargarCanales(urlFinal: String) {
+        // 1. Estado inicial (Tu lógica original pág. 6)
+        rvCanales.alpha = 0f
+        rvCanales.visibility = View.VISIBLE
+        progressBar.visibility = View.VISIBLE
+        imgFondoInicio.visibility = View.VISIBLE
+        layoutError.visibility = View.GONE
+
+        lifecycleScope.launch {
+            try {
+                val content = withContext(Dispatchers.IO) {
+                    // Usamos OkHttp para obtener el texto plano primero y decidir qué es
+                    val request = Request.Builder().url(urlFinal).build()
+                    client.newCall(request).execute().body()?.string() ?: ""
+                }
+
+                var listaFinal = listOf<CategoriaConCanales>()
+                val servidorActual = listaServidores.find { it.url == urlFinal }
+                val viewType = servidorActual?.viewType ?: "DEFAULT"
+
+                // 2. DETECCIÓN DE FORMATO
+                when {
+                    content.contains("#EXTM3U") -> {
+                        val listaM3U = procesarM3U(content)
+                        listaFinal = listOf(CategoriaConCanales("Lista M3U", listaM3U))
+                    }
+                    content.trim().startsWith("{") && !content.contains("\"samples\"") -> {
+                        // Es el formato de streametx (JSONObject con categorías como llaves)
+                        listaFinal = parsearCategoriasDesdeJson(content)
+                    }
+                    else -> {
+                        val parsedList = withContext(Dispatchers.IO) {
+                            try {
+                                // Como ApiService ahora devuelve List<IptvData>,
+                                // 'parsedList' ya recibe la lista directamente.
+                                RetrofitClient.instance.getIptvData(urlFinal)
+                            } catch (e: Exception) {
+                                android.util.Log.e("IPTV_ERROR", "Error en Retrofit: ${e.message}")
+                                emptyList<IptvData>()
+                            }
+                        }
+
+                        // El .map ahora funcionará perfectamente porque 'parsedList' es una List
+                        listaFinal = parsedList.map { data ->
+                            CategoriaConCanales(
+                                titulo = data.name ?: "General",
+                                canales = data.samples ?: emptyList(),
+                                viewType = viewType
+                            )
+                        }
+                    }
+                }
+
+                // 3. ACTUALIZAR UI (Tu lógica original pág. 7)
+                withContext(Dispatchers.Main) {
+                    if (listaFinal.isNotEmpty()) {
+                        // Si es Películas, forzamos el LayoutManager vertical para las filas
+                        rvCanales.layoutManager = LinearLayoutManager(this@MainActivity)
+                        rvCanales.adapter = MainVerticalAdapter(listaFinal) { canal ->
+                            reproducirCanal(canal)
+                        }
+                        finalizarCargaExitosa()
+                    } else {
+                        manejarErrorCarga("No hay contenidos disponibles")
+                    }
+                }
+
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    android.util.Log.e("IPTV_ERROR", "Error: ${e.message}")
+                    manejarErrorCarga("Error de conexión")
+                }
+            }
+        }
+    }
+
+    private fun parsearCategoriasDesdeJson(jsonString: String): List<CategoriaConCanales> {
+        val listaCategorias = mutableListOf<CategoriaConCanales>()
+        try {
+            val root = JSONObject(jsonString)
+            val keys = root.keys() // Aquí saca "LANCTV", "PARAGUAY", etc.
+
+            while (keys.hasNext()) {
+                val nombreCat = keys.next()
+                val arrayCanales = root.getJSONArray(nombreCat)
+                val listaCanales = mutableListOf<Sample>()
+
+                // --- AQUÍ ES DONDE ENTRAS A PROCESAR CADA CANAL ---
+                for (i in 0 until arrayCanales.length()) {
+                    val obj = arrayCanales.getJSONObject(i)
+
+// Dentro de tu parser manual, cuando creas el Sample:
+                    // Lógica "Inteligente": Si tiene logo úsalo, si no, busca icono
+                    val imagenFinal = when {
+                        obj.has("logo") -> obj.optString("logo")
+                        obj.has("icono") -> obj.optString("icono")
+                        else -> "" // O una URL de imagen por defecto
+                    }
+
+                    listaCanales.add(Sample(
+                        name = obj.optString("nombre").ifEmpty { obj.optString("name") },
+                        url = obj.optString("url"),
+                        icono = imagenFinal, // Aquí guardamos cualquiera de los dos en tu variable 'icono'
+                        type = obj.optString("type")
+                    ))
+                }
+                // -------------------------------------------------
+
+                if (listaCanales.isNotEmpty()) {
+                    listaCategorias.add(CategoriaConCanales(nombreCat, listaCanales))
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("JSON_ERROR", "Error parseando: ${e.message}")
+        }
+        return listaCategorias
+    }
+
+    // Función auxiliar para no repetir código de mapeo
+    private fun procesarArrayCanales(array: JSONArray): MutableList<Sample> {
+        val lista = mutableListOf<Sample>()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            lista.add(Sample(
+                name = obj.optString("nombre").ifEmpty { obj.optString("name") },
+                url = obj.optString("url"),
+                // Ojo aquí: el nuevo JSON usa "logo", el tuyo usaba "icono"
+                icono = obj.optString("logo").ifEmpty { obj.optString("icono") },
+                type = obj.optString("type"),
+            ))
+        }
+        return lista
+    }
+
+
+    private fun parseJsonEventos(jsonString: String): List<Sample> {
+        val lista = mutableListOf<Sample>()
+        try {
+            val array = JSONArray(jsonString)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                lista.add(Sample(
+                    name = obj.optString("title"), // En eventos usas 'title'
+                    url = obj.optString("link"),   // En eventos usas 'link'
+                    icono = obj.optString("img"),  // En eventos usas 'img'
+                    type = "WEBVIEW"               // Casi siempre los eventos son web
+                ))
+            }
+        } catch (e: Exception) {
+            Log.e("JSON_ERROR", "Error en eventos: ${e.message}")
+        }
+        return lista
+    }
+
+
+    // Función auxiliar para limpiar el código de animaciones
+    private fun finalizarCargaExitosa() {
+        progressBar.visibility = View.GONE
+        rvCanales.animate().alpha(1f).setDuration(400).start()
+        imgFondoInicio.animate()
+            .alpha(0f)
+            .setDuration(600)
+            .withEndAction {
+                imgFondoInicio.visibility = View.GONE
+                rvCanales.post { rvCanales.requestFocus() }
+            }
+            .start()
+    }
+
+
+    // Función auxiliar para no repetir código de error y evitar el negro
+    private fun manejarErrorCarga(mensaje: String) {
+        progressBar.visibility = View.GONE
+        Toast.makeText(this@MainActivity, mensaje, Toast.LENGTH_SHORT).show()
+
+        // Si falla, no dejamos la pantalla en negro, volvemos a mostrar el selector
+        mostrarSelectorDeServidor()
+    }
+
+    @OptIn(UnstableApi::class)
+    private fun setupPlayer() {
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                50_000, // Min buffer: 25 seg antes de dar error
+                60_000, // Max buffer: 60 seg de precarga
+                5_000,  // Buffer para iniciar: 3 seg
+                5_000   // Buffer para reanudar
+            )
+            .setPrioritizeTimeOverSizeThresholds(true)
+            //.setBackBuffer(10_000, true)
+            .build()
+
+        player = ExoPlayer.Builder(this)
+            .setLoadControl(loadControl)
+            .setSeekBackIncrementMs(15000)    // <--- Configura 15 segundos atrás
+            .setSeekForwardIncrementMs(15000) // <--- Configura 15 segundos adelante
+            .build()
+
+        playerView.player = player
+        playerView.useController = true
+        playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+
+// O RESIZE_MODE_FILL si no te importa que se estire un poco
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                progressBar.visibility = View.GONE
+                layoutError.visibility = View.VISIBLE
+
+                txtMensajeError.text = when (error.errorCode) {
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED -> "Conexión inestable, reintentando..."
+                    PlaybackException.ERROR_CODE_DRM_LICENSE_ACQUISITION_FAILED -> "Error de Licencia DRM"
+                    else -> "Buscando señal..."
+                }
+
+                playerView.postDelayed({
+                    if (layoutError.visibility == View.VISIBLE) {
+                        player.prepare()
+                        player.play()
+                        // No llamamos a onBackPressed() para no salir del canal
+                    }
+                }, 4000) // Esperamos 4 segundos para que el internet respire
+            }
+            override fun onPlaybackStateChanged(state: Int) {
+                // 1. Manejo del ProgressBar (Tu lógica original)
+                progressBar.visibility = if (state == Player.STATE_BUFFERING) View.VISIBLE else View.GONE
+
+                when (state) {
+                    Player.STATE_BUFFERING -> {
+                        // OPTIMIZACIÓN: Si el buffer se queda corto, ocultamos la superficie
+                        // para que se vea negro en lugar de una imagen congelada.
+                        playerView.videoSurfaceView?.visibility = View.INVISIBLE
+                    }
+
+                    Player.STATE_READY -> {
+                        // 2. Quitamos el error (Tu lógica original)
+                        layoutError.visibility = View.GONE
+
+                        // OPTIMIZACIÓN: Solo mostramos la superficie cuando el video está listo
+                        playerView.videoSurfaceView?.visibility = View.VISIBLE
+                    }
+
+                    Player.STATE_IDLE -> {
+                        // Si el player se detiene por error o cambio de canal, volvemos a negro
+                        playerView.videoSurfaceView?.visibility = View.INVISIBLE
+                    }
+                }
+            }
+           /*override fun onPlaybackStateChanged(state: Int) {
+                progressBar.visibility = if (state == Player.STATE_BUFFERING) View.VISIBLE else View.GONE
+                if (state == Player.STATE_READY) {
+                    layoutError.visibility = View.GONE
+                }
+            }*/
+        })
+    }
+    private fun aplicarEfectoFocus(view: View) {
+        view.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                // Se agranda un 15% y se trae al frente
+                v.animate().scaleX(1.15f).scaleY(1.15f).translationZ(10f).setDuration(200).start()
+            } else {
+                // Vuelve a su tamaño original
+                v.animate().scaleX(1f).scaleY(1f).translationZ(0f).setDuration(200).start()
+            }
+        }
+    }
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun reproducirCanal(canal: Sample) {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        layoutError.visibility = View.GONE
+
+        // Mantenemos tu lógica de foco actual
+        vistaUltimoCanal = rvCanales.focusedChild?.let { filaHorizontal ->
+            (filaHorizontal as? ViewGroup)?.focusedChild
+        }
+
+        rvCanales.apply {
+            isFocusable = false
+            descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        }
+
+        playerView.apply {
+            visibility = View.VISIBLE
+            useController = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        }
+
+        // --- NUEVA LÓGICA DE SOPORTE PARA EVENTOS ---
+
+        // 1. Priorizamos el nombre del evento si existe, si no, el del canal
+        val nombreFinal = canal.name
+        txtNombreCanalInfo.text = nombreFinal
+
+        // 2. Cargamos el logo
+        Glide.with(this)
+            .load(canal.icono)
+            .placeholder(R.mipmap.ic_launcher)
+            .into(imgLogoCanalInfo)
+        /*Glide.with(this)
+            .load(canal.icono)
+            .placeholder(R.drawable.ic_logo)
+            .error(R.drawable.ic_logo)
+            .centerCrop()
+            .into(imgLogoCanalInfo)*/
+
+        lanzarBanner()
+
+        // 3. Decidimos el motor de reproducción (Soporte para enlaces PHP de eventos)
+// ... dentro de reproducirCanal ...
+
+// 1. Obtenemos la URL y nos aseguramos de que no sea nula (si es nula, ponemos "")
+        val urlFinal = canal.url ?: ""
+
+// 2. Verificamos si es WEBVIEW o PHP usando la variable ya limpia
+        val esWebView = (canal.type?.uppercase() == "WEBVIEW") || urlFinal.contains(".php")
+
+        if (esWebView) {
+            // Usamos copy para forzar el tipo y pasar la URL segura
+            extraerUrlDeWebView(canal.copy(url = urlFinal, type = "WEBVIEW"))
+        } else {
+            // Ahora urlFinal es 'String' (no nula), por lo que el error rojo desaparecerá
+            prepararMotorYReproducir(
+                urlFinal,
+                canal.drm_license_uri,
+                canal.type,
+                canal.headersUrl
+            )
+        }
+        configurarControlesPlayer()
+    }
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun configurarControlesPlayer() {
+        playerView.postDelayed({
+            playerView.showController()
+            val btnRew = playerView.findViewById<ImageButton>(androidx.media3.ui.R.id.exo_rew)
+            val btnPlay = playerView.findViewById<ImageButton>(androidx.media3.ui.R.id.exo_play_pause)
+            val btnFfwd = playerView.findViewById<ImageButton>(androidx.media3.ui.R.id.exo_ffwd)
+            val progressBar = playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)
+
+            btnRew?.let { aplicarEfectoFocus(it) }
+            btnPlay?.let { aplicarEfectoFocus(it) }
+            btnFfwd?.let { aplicarEfectoFocus(it) }
+
+            // Navegación (Tus ajustes quirúrgicos)
+            btnRew?.nextFocusRightId = androidx.media3.ui.R.id.exo_play_pause
+            btnPlay?.nextFocusLeftId = androidx.media3.ui.R.id.exo_rew
+            btnPlay?.nextFocusRightId = androidx.media3.ui.R.id.exo_ffwd
+            btnFfwd?.nextFocusLeftId = androidx.media3.ui.R.id.exo_play_pause
+            btnPlay?.nextFocusDownId = androidx.media3.ui.R.id.exo_progress
+            btnRew?.nextFocusDownId = androidx.media3.ui.R.id.exo_progress
+            btnFfwd?.nextFocusDownId = androidx.media3.ui.R.id.exo_progress
+            progressBar?.nextFocusUpId = androidx.media3.ui.R.id.exo_play_pause
+
+            if (btnPlay != null) btnPlay.requestFocus() else playerView.requestFocus()
+        }, 300)
+    }
+
+
+    @OptIn(UnstableApi::class)
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (playerView.visibility == View.VISIBLE) {
+            if (playerView.dispatchKeyEvent(event)) {
+                return true
+            }
+            val teclasCriticas = event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                    event.keyCode == KeyEvent.KEYCODE_ENTER ||
+                    event.keyCode == KeyEvent.KEYCODE_DPAD_UP ||
+                    event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN ||
+                    event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT ||
+                    event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+
+            if (teclasCriticas) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    playerView.showController()
+                    playerView.requestFocus() // Aseguramos que el foco vuelva al player
+                }
+                return true // RETORNAMOS TRUE SIEMPRE: Esto mata el evento para la lista de atrás
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun lanzarBanner() {
+        layoutInfoCanal.visibility = View.VISIBLE
+        layoutInfoCanal.alpha = 0f
+        layoutInfoCanal.translationY = 100f
+        layoutInfoCanal.animate().alpha(1f).translationY(0f).setDuration(500).start()
+        layoutInfoCanal.postDelayed({
+            layoutInfoCanal.animate().alpha(0f).translationY(100f).setDuration(500).withEndAction {
+                layoutInfoCanal.visibility = View.GONE
+            }.start()
+        }, 2500)
+    }
+
+    private fun mostrarDialogoSalir() {
+        val builder = AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+        builder.setTitle("Salir")
+        builder.setMessage("¿Deseas cerrar la aplicación?")
+
+        builder.setPositiveButton("Sí, salir") { _, _ ->
+            finishAffinity() // Cierra toda la app y sus procesos
+        }
+
+        builder.setNegativeButton("Cancelar") { dialog, _ ->
+            dialog.dismiss()
+            // Opcional: devolver el foco al selector si es necesario
+        }
+
+        val dialog = builder.create()
+        dialog.show()
+
+        // Forzamos el foco en el botón de "Sí" para que solo den OK para salir
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).requestFocus()
+    }
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun extraerUrlDeWebView(canal: Sample) {
+        // IMPORTANTE: El WebView necesita el contexto de la Activity, no solo 'this' si es un Fragment
+        val webView = android.webkit.WebView(this)
+
+        // CONFIGURACIÓN DE TAMAÑO (Crucial para que carguen los scripts de video)
+        webView.layoutParams = android.view.ViewGroup.LayoutParams(1, 1) // 1x1 pixel
+        webView.visibility = android.view.View.VISIBLE // Debe estar visible para el sistema
+        webView.alpha = 0.1f // Casi transparente para que el usuario no lo note
+
+        // Añadirlo al layout principal de tu activity temporalmente
+        val rootLayout = findViewById<android.view.ViewGroup>(android.R.id.content)
+        rootLayout.addView(webView)
+
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true // Muchos sitios lo necesitan para el token
+        webView.settings.mediaPlaybackRequiresUserGesture = false // Para que el video intente iniciar solo
+
+        val ua = canal.headersUrl?.get("User-Agent") ?: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        webView.settings.userAgentString = ua
+
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldInterceptRequest(view: android.webkit.WebView?, request: android.webkit.WebResourceRequest?): android.webkit.WebResourceResponse? {
+                val urlDetectada = request?.url.toString()
+
+                // Log en Error para que resalte en ROJO
+                android.util.Log.e("RASTREO_TOTAL", "PETICIÓN: $urlDetectada")
+
+                if (urlDetectada.contains(".m3u8", ignoreCase = true) ||
+                    urlDetectada.contains(".mpd", ignoreCase = true) ||
+                    urlDetectada.contains(".mp4", ignoreCase = true)) {
+
+                    android.util.Log.e("CAPTURADOR_EXITO", "¡VÍDEO ENCONTRADO!: $urlDetectada")
+
+                    runOnUiThread {
+                        // Limpieza: Lo sacamos del layout antes de destruir
+                        rootLayout.removeView(webView)
+                        webView.stopLoading()
+                        webView.destroy()
+                        prepararMotorYReproducir(urlDetectada, null, "DIRECT", canal.headersUrl)
+                    }
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+        }
+
+        val extraHeaders = mutableMapOf<String, String>()
+        // Si el sitio pide Referer para cargar la web principal, añádelo aquí
+        canal.headersUrl?.get("Referer")?.let { extraHeaders["Referer"] = it }
+
+        canal.url?.let { urlSegura ->
+            webView.loadUrl(urlSegura, extraHeaders)
+        }
+    }
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun prepararMotorYReproducir(url: String, drmUri: String?, type: String?, headers: Map<String, String>?) {
+        // 1. Configuración del MediaItem (Una sola vez, bien estructurada)
+        // --- NUEVA LÓGICA DE LIMPIEZA ---
+        // Si la url contiene "?hls", lo eliminamos para estabilizar la señal
+        val urlLimpia = if (url.contains("?hls")) {
+            url.split("?hls")[0]
+        } else {
+            url
+        }
+        android.util.Log.e("ESTABILIZADOR", "URL Original: $url")
+        android.util.Log.e("ESTABILIZADOR", "URL Limpia: $urlLimpia")
+        // --------------------------------
+
+        // Ahora usamos 'urlLimpia' en lugar de 'url'
+        val mediaItemBuilder = MediaItem.Builder()
+            .setUri(urlLimpia)
+            .setLiveConfiguration(
+                MediaItem.LiveConfiguration.Builder()
+                    .setTargetOffsetMs(15_000)
+                    .build()
+            )
+        // Si es ClearKey, lo añadimos al builder ANTES del build()
+        if (type?.uppercase() == "CLEARKEY") {
+            mediaItemBuilder.setDrmConfiguration(
+                MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID)
+                    .setLicenseUri(drmUri)
+                    .build()
+            )
+        }
+
+        val mediaItem = mediaItemBuilder.build()
+
+        // 2. Configuración del DataSource con Headers y Timeouts largos
+        val dataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers ?: emptyMap())
+            .setConnectTimeoutMs(20_000) // 20 segundos para servidores lentos
+            .setReadTimeoutMs(20_000)
+            .setAllowCrossProtocolRedirects(true)
+
+        // 3. Factory de reintentos automáticos (El "tanque" contra errores de red)
+        val retryingDataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(
+            this,
+            dataSourceFactory
+        )
+
+        // 4. Creación del MediaSource Inteligente (Adaptable)
+        val mediaSource = when {
+            // Caso 1: DRM o DASH
+            urlLimpia.contains(".mpd") || type?.uppercase() == "CLEARKEY" -> {
+                androidx.media3.exoplayer.dash.DashMediaSource.Factory(retryingDataSourceFactory)
+                    .createMediaSource(mediaItem)
+            }
+            // Caso 2: Películas MP4
+            urlLimpia.lowercase().endsWith(".mp4") || type?.uppercase() == "PELICULA" -> {
+                androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(retryingDataSourceFactory)
+                    .createMediaSource(mediaItem)
+            }
+            // Caso 3: TU LÓGICA ORIGINAL PARA HLS (Canales m3u8)
+            else -> {
+                androidx.media3.exoplayer.hls.HlsMediaSource.Factory(retryingDataSourceFactory)
+                    .setAllowChunklessPreparation(false)
+                    .createMediaSource(mediaItem)
+            }
+        }
+
+        // 5. Carga y Reproducción
+        player.setMediaSource(mediaSource)
+        player.prepare()
+        player.play()
+    }
+
+    @OptIn(UnstableApi::class)
+    @SuppressLint("MissingSuperCall")
+    override fun onBackPressed() {
+        // CASO A: Salir del Reproductor al listado de canales
+        if (playerView.visibility == View.VISIBLE) {
+            // 1. Detener reproducción y limpiar pantalla
+            player.stop()
+            player.clearMediaItems()
+            playerView.visibility = View.GONE
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            layoutInfoCanal.visibility = View.GONE
+
+            // 2. Asegurar que el RecyclerView sea visible y focuseable
+            rvCanales.visibility = View.VISIBLE
+            rvCanales.alpha = 1f
+            rvCanales.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+
+            // 3. Recuperar el foco donde el usuario estaba
+            rvCanales.post {
+                val view = rvCanales.layoutManager?.findViewByPosition(ultimaPosicionCanal)
+                if (view != null && view.isAttachedToWindow) {
+                    view.requestFocus()
+                } else {
+                    rvCanales.scrollToPosition(ultimaPosicionCanal)
+                    rvCanales.requestFocus()
+                }
+            }
+            return // Bloqueamos la salida de la app
+        }
+
+        // CASO B: Salir del listado de canales al Selector de Servidores
+        if (rvCanales.visibility == View.VISIBLE) {
+            // 1. Ocultar canales y mostrar fondo de inicio
+            rvCanales.visibility = View.GONE
+            imgFondoInicio.visibility = View.VISIBLE
+            imgFondoInicio.alpha = 1f // Lo mostramos sólido de nuevo
+
+            // 2. Volver al menú de selección (la función que creamos ayer)
+            mostrarSelectorDeServidor()
+            return
+        }
+        mostrarDialogoSalir()
+
+    }
+}
+//------------
+package com.moisnostudio.jerutiapp
+
+import android.content.Intent
+import android.os.Bundle
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import com.bumptech.glide.Glide
+import com.moisnostudio.jerutiapp.model.Sample
+
+class DetallesPeliculaActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_detalles_pelicula)
+
+        val imgFondo = findViewById<ImageView>(R.id.imgFondo)
+        val txtTitulo = findViewById<TextView>(R.id.txtTitulo)
+        val txtSinopsis = findViewById<TextView>(R.id.txtSinopsis)
+        val btnPlay = findViewById<Button>(R.id.btnReproducir)
+
+// Recibimos los datos
+        val titulo = intent.getStringExtra("Pelicula_Nombre")
+        val desc = intent.getStringExtra("Pelicula_Desc")
+        val fondoUrl = intent.getStringExtra("Pelicula_Fondo")
+        val videoUrl = intent.getStringExtra("Pelicula_Url")
+
+// Pintamos la interfaz
+        txtTitulo.text = titulo
+        txtSinopsis.text = desc
+
+        Glide.with(this)
+            .load(fondoUrl)
+            .into(imgFondo)
+
+// Al darle Play, lanzamos el reproductor que ya tienes
+        btnPlay.setOnClickListener {
+
+        // Recuperar los datos del Intent
+        val nombre = intent.getStringExtra("Pelicula_Nombre")
+        val descripcion = intent.getStringExtra("Pelicula_Desc")
+        val urlVideo = intent.getStringExtra("Pelicula_Url")
+        val fondo = intent.getStringExtra("Pelicula_Fondo")
+
+        // Aquí es donde usarás Glide para cargar el 'fondo'
+        // y asignarás el 'nombre' y 'descripcion' a tus TextViews
+    }
+    }
+}
+//--------
+package com.moisnostudio.jerutiapp.model
+
+data class EventoPlano(
+    val name: String? = null,
+    val title: String? = null, // <--- Asegúrate de que esta línea EXISTA
+    val icono: String? = null,
+    val logo: String? = null,
+    val url: String? = null
+) {
+    // Esto es lo que hace que 'nombreFinal' no de error en el Adapter
+    val nombreFinal: String
+        get() = name ?: title ?: "Sin nombre"
+}
+//--------
+package com.moisnostudio.jerutiapp.model
+
+import com.google.gson.annotations.SerializedName
+
+// Esta clase es la que espera el Adapter
+data class CategoriaConCanales(
+    val titulo: String,
+    val canales: List<Sample>,
+    val viewType: String? = "GRID_HORIZONTAL"
+)
+
+// Busca tu clase IptvData o IptvResponse y déjala así:
+data class IptvData(
+    @SerializedName("name", alternate = ["nombre", "category"])
+    val name: String,
+
+    @SerializedName("samples", alternate = ["channels", "canales"])
+    val samples: List<Sample>
+)
+
+
+data class Sample(
+    @SerializedName("name", alternate = ["nombre", "title"])
+    val name: String? = null,
+
+    @SerializedName("url", alternate = ["link"])
+    val url: String? = null,
+
+    @SerializedName("icono", alternate = ["logo", "img", "iconpng", "iconoHorizontal"])
+    val icono: String? = null,
+
+    @SerializedName("type")
+    val type: String? = null,
+
+    @SerializedName("drm_license_uri")
+    val drm_license_uri: String? = null,
+
+    @SerializedName("headers")
+    val headersUrl: Map<String, String>? = null,
+
+    // Campos para VOD / Películas
+    val descripcion: String? = null,
+    val anio: String? = null,
+    val duracion: String? = null,
+    val genero: String? = null,
+    val tvgId: String? = null
+)
+//-------
+package com.moisnostudio.jerutiapp.model
+
+data class ServidorIPTV(
+    val nombre: String = "",
+    val url: String = "",
+    val logo: String = "",
+    val viewType: String? = "DEFAULT" // <--- AGREGA ESTA LÍNEA
+)
+//-------
+package com.moisnostudio.jerutiapp.network
+
+import com.moisnostudio.jerutiapp.model.IptvData
+import okhttp3.ResponseBody
+import retrofit2.http.GET
+import retrofit2.http.Url
+
+interface ApiService {
+    @GET
+    suspend fun getIptvData(@Url url: String): List<IptvData> // Cambia ResponseBody por List<IptvData>
+
+}
+
+//--------
+package com.moisnostudio.jerutiapp.network
+
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+
+object RetrofitClient {
+    private const val BASE_URL = "https://raw.githubusercontent.com/"
+
+    val instance: ApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
+    }
+}
+//-----
+package com.moisnostudio.jerutiapp.ui
+
+import com.moisnostudio.jerutiapp.R
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide // Necesitarás añadir Glide al build.gradle
+import com.moisnostudio.jerutiapp.model.Sample
+
+class CanalAdapter(
+    private val items: List<ItemUI>,
+    private val onCanalClick: (Sample) -> Unit
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    companion object {
+        private const val TYPE_TITULO = 0
+        private const val TYPE_CANAL = 1
+    }
+
+    override fun getItemViewType(position: Int) = when (items[position]) {
+        is ItemUI.Titulo -> TYPE_TITULO
+        is ItemUI.Canal -> TYPE_CANAL
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return if (viewType == TYPE_TITULO) {
+            // Crea un layout simple 'item_titulo.xml' con un TextView
+            val view = inflater.inflate(R.layout.item_titulo, parent, false)
+            TituloViewHolder(view)
+        } else {
+            val view = inflater.inflate(R.layout.item_canal, parent, false)
+            CanalViewHolder(view)
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        val item = items[position]
+        if (holder is TituloViewHolder && item is ItemUI.Titulo) {
+            holder.txtTitulo.text = item.nombre
+        } else if (holder is CanalViewHolder && item is ItemUI.Canal) {
+            holder.nombre.text = item.datos.name
+            Glide.with(holder.itemView.context).load(item.datos.icono).into(holder.icono)
+            holder.itemView.setOnClickListener { onCanalClick(item.datos) }
+        }
+    }
+
+    override fun getItemCount() = items.size
+
+    class TituloViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val txtTitulo: TextView = view.findViewById(R.id.txtTituloSeccion)
+    }
+
+    class CanalViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val nombre: TextView = view.findViewById(R.id.txtNombreCanal)
+        val icono: ImageView = view.findViewById(R.id.imgIcono)
+    }
+}
+//---------------
+package com.moisnostudio.jerutiapp.ui
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CenterCrop
+import com.moisnostudio.jerutiapp.R
+import com.moisnostudio.jerutiapp.model.Sample
+import com.bumptech.glide.load.resource.bitmap.RoundedCorners
+
+class CanalHorizontalAdapter(
+    private val canales: List<Sample>,
+    private val viewTypeStr: String?, // Recibimos el tipo de Firebase
+    private val onCanalClick: (Sample) -> Unit
+) : RecyclerView.Adapter<CanalHorizontalAdapter.ViewHolder>() {
+
+    init {
+        setHasStableIds(true)
+    }
+
+    // Mantenemos tus IDs únicos para evitar parpadeos
+    override fun getItemId(position: Int): Long {
+        return canales[position].url?.hashCode()?.toLong() ?: position.toLong()
+    }
+
+    // Determinamos qué layout inflar
+    override fun getItemViewType(position: Int): Int {
+        return if (viewTypeStr == "POSTER_VERTICAL") 1 else 0
+    }
+
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val nombre: TextView = view.findViewById(R.id.txtNombreCanal)
+        val icono: ImageView = view.findViewById(R.id.imgIcono)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        // Elegimos el XML según el tipo, pero ambos deben tener los mismos IDs internos
+        val layout = if (viewType == 1) {
+            R.layout.item_canal_poster // Nuevo: Diseño vertical estilo Netflix
+        } else {
+            R.layout.item_canal_horizontal // El tuyo actual: Diseño horizontal
+        }
+
+        val view = LayoutInflater.from(parent.context).inflate(layout, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val canal = canales[position]
+
+        holder.nombre.text = canal.name
+
+        // Glide se adapta automáticamente al tamaño del ImageView
+        Glide.with(holder.itemView.context)
+            .load(canal.icono)
+            .transform(CenterCrop(), RoundedCorners(12))
+            .into(holder.icono)
+
+        holder.itemView.setOnClickListener { onCanalClick(canal) }
+
+        // Mantenemos intacto tu efecto de foco (Android TV)
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                view.animate().scaleX(1.12f).scaleY(1.12f).setDuration(200).start()
+                view.setBackgroundResource(R.drawable.bg_focus_canal)
+                view.z = 10f
+            } else {
+                view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+                view.setBackgroundResource(android.R.color.transparent)
+                view.z = 0f
+            }
+        }
+    }
+
+    override fun getItemCount() = canales.size
+}
+//------------------
+package com.moisnostudio.jerutiapp.ui
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.moisnostudio.jerutiapp.R
+import com.moisnostudio.jerutiapp.model.Sample
+
+class EventoGridAdapter(
+    private val eventos: List<Sample>,
+    private val onEventoClick: (Sample) -> Unit
+) : RecyclerView.Adapter<EventoGridAdapter.ViewHolder>() {
+
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val nombre: TextView = view.findViewById(R.id.txtNombreEvento)
+        val icono: ImageView = view.findViewById(R.id.imgIconoEvento)
+     }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_evento_grid, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val evento = eventos[position]
+
+        // Ya no necesitas .title, porque GSON lo guarda en .name
+        holder.nombre.text = evento.name ?: "Sin nombre"
+
+
+        Glide.with(holder.itemView.context)
+            .load(evento.icono)
+            .placeholder(R.mipmap.ic_launcher)
+            .error(R.mipmap.ic_launcher)
+            .into(holder.icono)
+
+        holder.itemView.setOnClickListener { onEventoClick(evento) }
+
+        ViewUtils.aplicarEfectoFocus(holder.itemView)
+    }
+    override fun getItemCount() = eventos.size
+}
+//-----------------
+package com.moisnostudio.jerutiapp.ui
+
+import com.moisnostudio.jerutiapp.model.Sample
+
+sealed class ItemUI {
+    data class Titulo(val nombre: String) : ItemUI()
+    data class Canal(val datos: Sample) : ItemUI()
+}
+//------------
+package com.moisnostudio.jerutiapp.ui
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.moisnostudio.jerutiapp.R
+import com.moisnostudio.jerutiapp.model.Sample
+
+class MainVerticalAdapter(
+    private val categorias: List<com.moisnostudio.jerutiapp.model.CategoriaConCanales>,
+    private val onCanalClick: (Sample) -> Unit
+) : RecyclerView.Adapter<MainVerticalAdapter.ViewHolder>() {
+
+    // 1. Definimos los tipos de vista
+    companion object {
+        const val TYPE_HORIZONTAL = 0
+        const val TYPE_POSTER = 1
+    }
+
+    init {
+        setHasStableIds(true)
+    }
+
+    // 2. Determinamos qué tipo de vista usar según el modelo
+    override fun getItemViewType(position: Int): Int {
+        // Si es POSTER_VERTICAL devolvemos 1, si no 0
+        return if (categorias[position].viewType == "POSTER_VERTICAL") 1 else 0
+    }
+
+    override fun getItemId(position: Int): Long {
+        return categorias[position].titulo.hashCode().toLong()
+    }
+
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val txtTitulo: TextView = view.findViewById(R.id.txtTituloCategoria)
+        val rvHorizontal: RecyclerView = view.findViewById(R.id.rvHorizontal)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        // 3. Aquí podrías inflar layouts diferentes si el diseño de la fila cambia mucho
+        // Por ahora usamos el mismo contenedor de RecyclerView
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_fila_categoria, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val item = categorias[position]
+        holder.txtTitulo.text = item.titulo
+
+        // 1. Configuramos el LayoutManager ANTES del adapter
+        holder.rvHorizontal.apply {
+            // Si ya tiene uno, no lo volvemos a crear (optimización)
+            if (layoutManager == null) {
+                layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            }
+
+            // 2. Asignamos el adaptador con el viewType (Netflix o Normal)
+            adapter = CanalHorizontalAdapter(
+                item.canales,
+                item.viewType,
+                onCanalClick
+            )
+
+            // 3. Configuraciones de foco para Android TV
+            isFocusable = false
+            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+
+            // Limpiamos caché para evitar que se mezclen posters con cuadrados
+            recycledViewPool.clear()
+        }
+    }
+
+
+    override fun getItemCount() = categorias.size
+}
+//-------------------
+package com.moisnostudio.jerutiapp.ui
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.moisnostudio.jerutiapp.R
+import com.moisnostudio.jerutiapp.model.Sample
+
+class PeliculasGridAdapter(
+    private val pelis: List<Sample>,
+    private val onFocusAction: (View) -> Unit,
+    private val onClick: (Sample) -> Unit
+) : RecyclerView.Adapter<PeliculasGridAdapter.PeliViewHolder>() {
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PeliViewHolder {
+        // Usa un layout simple: un CardView con una ImageView de 2:3 de aspecto
+        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_peli_poster, parent, false)
+        return PeliViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: PeliViewHolder, position: Int) {
+        val peli = pelis[position]
+
+        Glide.with(holder.itemView.context)
+            .load(peli.icono)
+            .placeholder(R.drawable.ic_logo) // Pon un icono temporal
+            .error(R.drawable.ic_logo)     // Si falla el HTTP, que se vea algo
+            .centerCrop()
+            .into(holder.imgPoster)
+
+
+        // Efecto de foco para navegación con control remoto
+        onFocusAction(holder.itemView)
+
+        // Click para abrir detalles
+        holder.itemView.setOnClickListener {
+            onClick(peli)
+        }
+    }
+
+    override fun getItemCount() = pelis.size
+    class PeliViewHolder(v: View) : RecyclerView.ViewHolder(v) {
+        val imgPoster: ImageView = v.findViewById(R.id.imgPoster)
+    }
+}
+//-------------------------
+package com.moisnostudio.jerutiapp.ui
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.moisnostudio.jerutiapp.R
+import com.moisnostudio.jerutiapp.model.ServidorIPTV
+
+class ServidoresAdapter(
+    private val servidores: List<ServidorIPTV>,
+    private val onServerSelected: (ServidorIPTV) -> Unit
+) : RecyclerView.Adapter<ServidoresAdapter.ViewHolder>() {
+
+    // 1. EL VIEWHOLDER: Aquí vinculamos los elementos del XML (item_servidor.xml)
+    class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val nombre: TextView = view.findViewById(R.id.txtNombreServidor)
+        val imgLogo: ImageView = view.findViewById(R.id.imgLogoServidor)
+    }
+
+    // 2. CREAR LA VISTA: Infla el diseño de la tarjeta
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_servidor, parent, false)
+        return ViewHolder(view)
+    }
+
+    // 3. CARGAR DATOS: Aquí ocurre la magia de Netflix y el foco de la TV
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val servidor = servidores[position]
+
+        holder.nombre.text = servidor.nombre
+
+        // Carga la imagen de Firebase usando Glide
+        Glide.with(holder.itemView.context)
+            .load(servidor.logo)
+            .placeholder(android.R.drawable.ic_menu_gallery)
+            .error(android.R.drawable.ic_menu_report_image)
+            .into(holder.imgLogo)
+
+        holder.itemView.isFocusable = true
+        holder.itemView.isFocusableInTouchMode = true
+
+        holder.itemView.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                // Efecto de agrandar cuando el usuario se posiciona encima
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(200).start()
+                v.elevation = 10f
+            } else {
+                // Volver al tamaño normal al quitar el foco
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+                v.elevation = 0f
+            }
+        }
+        holder.itemView.setOnClickListener {
+            onServerSelected(servidor)
+        }
+    }
+
+    override fun getItemCount() = servidores.size
+}
+//---------------------
+package com.moisnostudio.jerutiapp.ui
+
+import android.view.View
+
+object ViewUtils {
+    fun aplicarEfectoFocus(view: View) {
+        view.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(200).start()
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+            }
+        }
+    }
+}
+//-----------------------
