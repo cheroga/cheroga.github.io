@@ -1,41 +1,140 @@
 <!DOCTYPE html>
-<html>
-	<head>
-        <meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>Fluid Width Videos with Fitvids.js</title>
-        <style>
-          body {
-            background: #000000;
-          }
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏆 Mundial 2026</title>
+  <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f0f0f; color: #fff; font-family: Arial, sans-serif; }
+    h1 { text-align: center; padding: 20px; color: #f90; font-size: 1.4em; }
+    #container { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; }
+    .canal-btn {
+      background: #1e1e1e; border: 1px solid #333; color: #fff;
+      padding: 10px 16px; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px; font-size: 0.9em;
+    }
+    .canal-btn:hover { background: #f90; color: #000; }
+    .canal-btn img { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; }
+    #player-section { padding: 10px; }
+    #now-playing { text-align: center; padding: 8px; color: #f90; font-size: 1em; }
+    video {
+      width: 100%; max-width: 900px; display: block;
+      margin: 0 auto; border-radius: 10px; background: #000;
+    }
+    .categoria { width: 100%; padding: 8px 0 4px; color: #aaa; font-size: 0.85em; text-transform: uppercase; }
+  </style>
+</head>
+<body>
 
-          video {
-            max-width: 100%;
-            height: auto;
-          }
+<h1>🏆 MUNDIAL 2026 - EN VIVO</h1>
 
-          iframe,
-          embed,
-          object {
-            max-width: 100%;
+<div id="player-section">
+  <div id="now-playing">Selecciona un canal</div>
+  <video id="video" controls autoplay></video>
+</div>
+
+<div id="container">Cargando canales...</div>
+
+<script>
+  const JSON_URL = "https://mundodeportes.online/pandatv/playpre/canales.json";
+
+  // Inicializar Shaka Player
+  shaka.polyfill.installAll();
+  const video = document.getElementById("video");
+  const player = new shaka.Player(video);
+
+  player.addEventListener("error", (e) => {
+    console.error("Shaka error:", e.detail);
+  });
+
+  async function playChannel(canal) {
+    document.getElementById("now-playing").textContent = "▶ " + canal.name;
+
+    await player.unload();
+
+    // Configurar headers
+    if (canal.headers) {
+      player.getNetworkingEngine().registerRequestFilter((type, request) => {
+        if (canal.headers.Origin)      request.headers["Origin"]     = canal.headers.Origin;
+        if (canal.headers.Referer)     request.headers["Referer"]    = canal.headers.Referer;
+        if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
+      });
+    }
+
+    // Configurar DRM ClearKey
+    let drmConfig = {};
+    if (canal.drm_license_uri && canal.type === "CLEARKEY") {
+      // Extraer keyId y key de la URL
+      // Formato: ?keyid=XXXX&key=YYYY
+      const url = new URL(canal.drm_license_uri);
+      const keyId = url.searchParams.get("keyid");
+      const key   = url.searchParams.get("key");
+
+      if (keyId && key) {
+        drmConfig = {
+          clearKeys: {
+            [keyId]: key
           }
-          .unsupported {
-            background: #000000;
+        };
+      } else {
+        // Si es URL de servidor de licencias
+        drmConfig = {
+          servers: {
+            "org.w3.clearkey": canal.drm_license_uri
           }
-        </style>
-    </head>
-    <body>
-      <div class="container">
-        	<center><iframe width="100%" height="100%" src="https:\/\/i.ibb.co\/jkTvMpKH\/DTV-sports-logo-white.png" frameborder="0" allowfullscreen></iframe></center>
-	      </div>
-      <script  src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
-      <script src="http://mensajerofm.org/app/cheroga.org/jquery.fitvids.js"></script>
-      <script>
-        // Basic FitVids Test
-        $(".container").fitVids();
-        // Custom selector and No-Double-Wrapping Prevention Test
-        $(".container").fitVids({ customSelector: "iframe[src^='http://socialcam.com']"});
-		$('video').trigger('play');
-$('.container').trigger('play');
-      </script>
-      </body>
-  </html>
+        };
+      }
+    }
+
+    player.configure({ drm: drmConfig });
+
+    try {
+      await player.load(canal.url);
+    } catch (e) {
+      console.error("Error cargando:", e);
+      document.getElementById("now-playing").textContent = "❌ Error al cargar: " + canal.name;
+    }
+  }
+
+  async function loadChannels() {
+    try {
+      // CORS workaround
+      const PROXY = "https://corsproxy.io/?";
+      const res = await fetch(PROXY + encodeURIComponent(JSON_URL));
+      const data = await res.json();
+
+      const container = document.getElementById("container");
+      container.innerHTML = "";
+
+      data.forEach(categoria => {
+        const catLabel = document.createElement("div");
+        catLabel.className = "categoria";
+        catLabel.textContent = "📁 " + categoria.name;
+        container.appendChild(catLabel);
+
+        categoria.samples.forEach(canal => {
+          const btn = document.createElement("button");
+          btn.className = "canal-btn";
+
+          const img = document.createElement("img");
+          img.src = canal.icono || "";
+          img.onerror = () => img.style.display = "none";
+
+          btn.appendChild(img);
+          btn.appendChild(document.createTextNode(canal.name));
+          btn.onclick = () => playChannel(canal);
+          container.appendChild(btn);
+        });
+      });
+
+    } catch (e) {
+      document.getElementById("container").textContent = "Error cargando canales: " + e.message;
+    }
+  }
+
+  loadChannels();
+</script>
+</body>
+</html>
