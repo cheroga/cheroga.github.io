@@ -1,86 +1,11 @@
-[
-  {
-    "name": "EVENTOS PY",
-    "samples": [
-      {
-        "name": "EVENTOS M3U8",
-        "url": "https://lbgo.bozztv.com/ssh101/ssh101/tvplaytv/playlist.m3u8",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      },
-      {
-        "name": "EVENTOS M3U8 2",
-        "url": "http://45.170.130.224:8000/play/a04k/index.m3u8?hls",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      },
-      {
-        "name": "EVENTOS 1",
-        "url": "https://lbgo.bozztv.com/ssh101/ssh101/lajdhdhue/playlist.m3u8",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS",
-        "headers": {
-          "Origin": "https://www.tigosports.com.py",
-          "Referer": "https://www.tigosports.com.py/",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
-        }
-      },
-      {
-        "name": "EVENTOS 1 OPC 2",
-        "url": "https://sam-py-edge05.tigo.com.py/ccur-session/6a24671b87/rolling-buffer/TigoSP4_WM/TigoSP4_WM/transmux/index.mpd",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "DASH",
-        "drm_license_uri": "https://mundodeportes.online/pandatv/flow/keys.php?keyid=49b2c0e7037042b2aff9f064e0bb3311&key=83849e30adf85440550292693147fbf7"
-      },
-      {
-        "name": "EVENTOS 1 OPC 3",
-        "url": "https://sam-py-edge09.tigo.com.py/ccur-session/6a24671b87/rolling-buffer/TigoSP4_WM/TigoSP4_WM/transmux/index.mpd",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "DASH",
-        "drm_license_uri": "https://mundodeportes.online/pandatv/flow/keys.php?keyid=49b2c0e7037042b2aff9f064e0bb3311&key=83849e30adf85440550292693147fbf7"
-      },
-      {
-        "name": "EVENTOS 2",
-        "url": "https://sam-py-edge05.tigo.com.py/ccur-session/6a3f0c56e5/rolling-buffer/APP_CHN2/APP_CHN2/transmux/index.m3u8",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      },
-      {
-        "name": "EVENTOS 2 OPC 2",
-        "url": "https://sam-py-edge05.tigo.com.py/ccur-session/01_1609042442/rolling-buffer/APP_CHN2/APP_CHN2/transmux/index.m3u8",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      },
-      {
-        "name": "EVENTOS 2 OPC 3",
-        "url": "https://sam-py-edge09.tigo.com.py/ccur-session/01_1609042442/rolling-buffer/APP_CHN2/APP_CHN2/transmux/index.m3u8",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      },
-      {
-        "name": "EVENTOS 3",
-        "url": "https://sam-py-edge05.tigo.com.py/ccur-session/6a3f0c56e5/rolling-buffer/APP_CHN3/APP_CHN3/transmux/index.m3u8",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      },
-      {
-        "name": "EVENTOS 3 OPC 2",
-        "url": "https://sam-py-edge05.tigo.com.py/ccur-session/6a2475d752/rolling-buffer/APP_CHN3/APP_CHN3/transmux/index.mpd",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "DASH"
-      },
-      {
-        "name": "EVENTOS 3 OPC 3",
-        "url": "https://sam-py-edge09.tigo.com.py/ccur-session/01_1609042442/rolling-buffer/APP_CHN3/APP_CHN3/transmux/index.m3u8",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      },
-      {
-        "name": "TIGO PRUEBA",
-        "url": "https://000963.videx.lol/tvtvhd/even2/index.m3u8?key=38b0d37d7fd8afd87a619f0bbb5b1aa455a47a1f8fd1d7b5d8fa407b8fd0830d&expires=1782961369",
-        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
-        "type": "HLS"
-      }
-    ]
-  }
-]
+[{"name":"EVENTOS PY","samples":[{"name":"EVENTOS M3U8","url":"https://lbgo.bozztv.com/ssh101/ssh101/tvplaytv/playlist.m3u8","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"HLS","drm_license_uri":""}
+,
+{"name":"EVENTOS M3U8 2","url":"http://45.170.130.224:8000/play/a04k/index.m3u8?hls","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"HLS","drm_license_uri":""}
+,
+{"name":"EVENTOS 1","url":"https://lbgo.bozztv.com/ssh101/ssh101/lajdhdhue/playlist.m3u8","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"CLEARKEY","headers":{"Origin":"https://www.tigosports.com.py","Referer":"https://www.tigosports.com.py/","User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"}}
+,
+{"name":"EVENTOS 1 OPC 2","url":"https://sam-py-edge05.tigo.com.py/ccur-session/6a24671b87/rolling-buffer/TigoSP4_WM/TigoSP4_WM/transmux/index.mpd","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"HLS","drm_license_uri":"https://mundodeportes.online/pandatv/flow/keys.php?keyid=49b2c0e7037042b2aff9f064e0bb3311&key=83849e30adf85440550292693147fbf7"}
+,
+{"name":"EVENTOS 1 OPC 3","url":"https://sam-py-edge09.tigo.com.py/ccur-session/6a24671b87/rolling-buffer/TigoSP4_WM/TigoSP4_WM/transmux/index.mpd","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"CLEARKEY","drm_license_uri":"https://mundodeportes.online/pandatv/flow/keys.php?keyid=49b2c0e7037042b2aff9f064e0bb3311&key=83849e30adf85440550292693147fbf7"},{"name":"EVENTOS 2","url":"https://sam-py-edge05.tigo.com.py/ccur-session/6a3f0c56e5/rolling-buffer/APP_CHN2/APP_CHN2/transmux/index.m3u8","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"CLEARKEY","drm_license_uri":""},{"name":"EVENTOS 2 OPC 2","url":"https://sam-py-edge05.tigo.com.py/ccur-session/01_1609042442/rolling-buffer/APP_CHN2/APP_CHN2/transmux/index.m3u8","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"CLEARKEY","drm_license_uri":""},{"name":"EVENTOS 2 OPC 3","url":"https://sam-py-edge09.tigo.com.py/ccur-session/01_1609042442/rolling-buffer/APP_CHN2/APP_CHN2/transmux/index.m3u8","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"CLEARKEY","drm_license_uri":""},{"name":"EVENTOS 3","url":"https://sam-py-edge05.tigo.com.py/ccur-session/6a3f0c56e5/rolling-buffer/APP_CHN3/APP_CHN3/transmux/index.m3u8","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"HLS","drm_license_uri":""},{"name":"EVENTOS 3 OPC 2","url":"https://sam-py-edge05.tigo.com.py/ccur-session/6a2475d752/rolling-buffer/APP_CHN3/APP_CHN3/transmux/index.mpd","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"CLEARKEY","drm_license_uri":""},{"name":"EVENTOS 3 OPC 3","url":"https://sam-py-edge09.tigo.com.py/ccur-session/01_1609042442/rolling-buffer/APP_CHN3/APP_CHN3/transmux/index.m3u8","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg","type":"CLEARKEY","drm_license_uri":""}
+,
+{"name":"TIGO PRUEBA","url":"https://000963.videx.lol/tvtvhd/even2/index.m3u8?key=38b0d37d7fd8afd87a619f0bbb5b1aa455a47a1f8fd1d7b5d8fa407b8fd0830d&expires=1782961369","icono":"https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg"}]}]
