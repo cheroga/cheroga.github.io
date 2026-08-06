@@ -51,52 +51,42 @@
 
   async function playChannel(canal) {
     document.getElementById("now-playing").textContent = "▶ " + canal.name;
-
     await player.unload();
 
-    // Configurar headers
+    // 1. Configurar headers dinámicos
     if (canal.headers) {
-      player.getNetworkingEngine().registerRequestFilter((type, request) => {
-        if (canal.headers.Origin)      request.headers["Origin"]     = canal.headers.Origin;
-        if (canal.headers.Referer)     request.headers["Referer"]    = canal.headers.Referer;
-        if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
-      });
+        player.getNetworkingEngine().registerRequestFilter((type, request) => {
+            if (canal.headers.Origin) request.headers["Origin"] = canal.headers.Origin;
+            if (canal.headers.Referer) request.headers["Referer"] = canal.headers.Referer;
+            if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
+        });
     }
 
-    // Configurar DRM ClearKey
+    // 2. Configurar DRM ClearKey
     let drmConfig = {};
     if (canal.drm_license_uri && canal.type === "CLEARKEY") {
-      // Extraer keyId y key de la URL
-      // Formato: ?keyid=XXXX&key=YYYY
-      const url = new URL(canal.drm_license_uri);
-      const keyId = url.searchParams.get("keyid");
-      const key   = url.searchParams.get("key");
-
-      if (keyId && key) {
-        drmConfig = {
-          clearKeys: {
-            [keyId]: key
-          }
-        };
-      } else {
-        // Si es URL de servidor de licencias
-        drmConfig = {
-          servers: {
-            "org.w3.clearkey": canal.drm_license_uri
-          }
-        };
-      }
+        const url = new URL(canal.drm_license_uri);
+        const keyId = url.searchParams.get("keyid");
+        const key = url.searchParams.get("key");
+        if (keyId && key) {
+            drmConfig = { clearKeys: { [keyId]: key } };
+        } else {
+            drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
+        }
     }
-
     player.configure({ drm: drmConfig });
 
     try {
-      await player.load(canal.url);
+        // ENVOLVER LA URL DEL CANAL CON EL PROXY
+        // Esto soluciona el error 403 al delegar la petición al servidor de corsproxy
+        const finalUrl = PROXY + encodeURIComponent(canal.url);
+        await player.load(finalUrl);
     } catch (e) {
-      console.error("Error cargando:", e);
-      document.getElementById("now-playing").textContent = "❌ Error al cargar: " + canal.name;
+        console.error("Error cargando:", e);
+        document.getElementById("now-playing").textContent = "❌ Error al cargar: " + canal.name;
     }
-  }
+}
+
 
   async function loadChannels() {
     try {
