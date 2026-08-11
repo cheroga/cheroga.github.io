@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🏆 Deportes 2026</title>
+  <title>ðŸ† FUTBOL 2026</title>
   <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<h1>🏆 DEPORTES 2026 - EN VIVO</h1>
+<h1>ðŸ† FUTBOL 2026 - EN VIVO</h1>
 
 <div id="player-section">
   <div id="now-playing">Selecciona un canal</div>
@@ -50,43 +50,53 @@
   });
 
   async function playChannel(canal) {
-    document.getElementById("now-playing").textContent = "▶ " + canal.name;
+    document.getElementById("now-playing").textContent = "â–¶ " + canal.name;
+
     await player.unload();
 
-    // 1. Configurar headers dinámicos
+    // Configurar headers
     if (canal.headers) {
-        player.getNetworkingEngine().registerRequestFilter((type, request) => {
-            if (canal.headers.Origin) request.headers["Origin"] = canal.headers.Origin;
-            if (canal.headers.Referer) request.headers["Referer"] = canal.headers.Referer;
-            if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
-        });
+      player.getNetworkingEngine().registerRequestFilter((type, request) => {
+        if (canal.headers.Origin)      request.headers["Origin"]     = canal.headers.Origin;
+        if (canal.headers.Referer)     request.headers["Referer"]    = canal.headers.Referer;
+        if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
+      });
     }
 
-    // 2. Configurar DRM ClearKey
+    // Configurar DRM ClearKey
     let drmConfig = {};
     if (canal.drm_license_uri && canal.type === "CLEARKEY") {
-        const url = new URL(canal.drm_license_uri);
-        const keyId = url.searchParams.get("keyid");
-        const key = url.searchParams.get("key");
-        if (keyId && key) {
-            drmConfig = { clearKeys: { [keyId]: key } };
-        } else {
-            drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
-        }
+      // Extraer keyId y key de la URL
+      // Formato: ?keyid=XXXX&key=YYYY
+      const url = new URL(canal.drm_license_uri);
+      const keyId = url.searchParams.get("keyid");
+      const key   = url.searchParams.get("key");
+
+      if (keyId && key) {
+        drmConfig = {
+          clearKeys: {
+            [keyId]: key
+          }
+        };
+      } else {
+        // Si es URL de servidor de licencias
+        drmConfig = {
+          servers: {
+            "org.w3.clearkey": canal.drm_license_uri
+          }
+        };
+      }
     }
+
     player.configure({ drm: drmConfig });
 
     try {
-        // ENVOLVER LA URL DEL CANAL CON EL PROXY
-        // Esto soluciona el error 403 al delegar la petición al servidor de corsproxy
-        const finalUrl = PROXY + encodeURIComponent(canal.url);
-        await player.load(finalUrl);
+      await player.load(canal.url);
     } catch (e) {
-        console.error("Error cargando:", e);
-        document.getElementById("now-playing").textContent = "❌ Error al cargar: " + canal.name;
+      console.error("Error cargando:", e);
+      document.getElementById("now-playing").textContent = "âŒ Error al cargar: " + canal.name;
     }
-}
-
+  }
 
   async function loadChannels() {
     try {
@@ -101,7 +111,7 @@
       data.forEach(categoria => {
         const catLabel = document.createElement("div");
         catLabel.className = "categoria";
-        catLabel.textContent = "📁 " + categoria.name;
+        catLabel.textContent = "ðŸ“ " + categoria.name;
         container.appendChild(catLabel);
 
         categoria.samples.forEach(canal => {
