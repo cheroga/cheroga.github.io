@@ -1,150 +1,178 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FUTBOL 2026</title>
-  <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0f0f0f; color: #fff; font-family: Arial, sans-serif; }
-    h1 { text-align: center; padding: 20px; color: #f90; font-size: 1.4em; }
-    #container { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px; }
-    .canal-btn {
-      background: #1e1e1e; border: 1px solid #333; color: #fff;
-      padding: 10px 16px; border-radius: 8px; cursor: pointer;
-      display: flex; align-items: center; gap: 8px; font-size: 0.9em;
-    }
-    .canal-btn:hover { background: #f90; color: #000; }
-    .canal-btn img { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; }
-    #player-section { padding: 10px; }
-    #now-playing { text-align: center; padding: 8px; color: #f90; font-size: 1em; }
-    video {
-      width: 100%; max-width: 900px; display: block;
-      margin: 0 auto; border-radius: 10px; background: #000;
-    }
-    .categoria { width: 100%; padding: 8px 0 4px; color: #aaa; font-size: 0.85em; text-transform: uppercase; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FUTBOL 2026</title>
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: Arial, sans-serif; }
+        h1 { text-align: center; padding: 20px 20px 10px 20px; color: #f90; font-size: 1.4em; }
+        #player-section { position: sticky; top: 0; background: #0f0f0f; padding: 10px; z-index: 100; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); }
+        #now-playing { text-align: center; padding: 8px; color: #f90; font-size: 1em; }
+        video { width: 100%; max-width: 900px; display: block; margin: 0 auto; border-radius: 10px; background: #000; }
+        #container { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px 10px 40px 10px; }
+        .canal-btn { background: #1e1e1e; border: 1px solid #333; color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
+        .canal-btn:hover { background: #f90; color: #000; }
+        .canal-btn img { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; }
+        .categoria { width: 100%; padding: 15px 0 4px; color: #aaa; font-size: 0.85em; text-transform: uppercase; font-weight: bold; }
+    </style>
 </head>
 <body>
 
-<h1>FUTBOL 2026 - EN VIVO</h1>
+    <h1>FUTBOL 2026 - EN VIVO</h1>
 
-<div id="player-section">
-  <div id="now-playing">Selecciona un canal</div>
-  <video id="video" controls autoplay></video>
-</div>
+    <div id="player-section">
+        <div id="now-playing">Selecciona un canal</div>
+        <video id="video" controls autoplay></video>
+    </div>
 
-<div id="container">Cargando canales...</div>
+    <div id="container">Cargando canales...</div>
 
 <script>
-  const JSON_URL = "https://raw.githubusercontent.com/cheroga/cheroga.github.io/refs/heads/master/canales_cache.json";
+    const JSON_URL = "https://raw.githubusercontent.com/cheroga/cheroga.github.io/refs/heads/master/canales_cache.json";
+    let currentCanal = null; // Guardar el canal actual para reintentos forzados
 
-  // Inicializar Shaka Player
-  shaka.polyfill.installAll();
-  const video = document.getElementById("video");
-  const player = new shaka.Player(video);
+    shaka.polyfill.installAll();
+    const video = document.getElementById("video");
+    const player = new shaka.Player(video);
 
-  player.addEventListener("error", (e) => {
-    console.error("Shaka error:", e.detail);
-  });
-
-  async function playChannel(canal) {
-    document.getElementById("now-playing").textContent = "â–¶ " + canal.name;
-
-    await player.unload();
-
-    // Configurar headers
-    if (canal.headers) {
-      player.getNetworkingEngine().registerRequestFilter((type, request) => {
-        if (canal.headers.Origin)      request.headers["Origin"]     = canal.headers.Origin;
-        if (canal.headers.Referer)     request.headers["Referer"]    = canal.headers.Referer;
-        if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
-      });
-    }
-
-    // Configurar DRM ClearKey
-    let drmConfig = {};
-    if (canal.drm_license_uri && canal.type === "CLEARKEY") {
-      // Extraer keyId y key de la URL
-      // Formato: ?keyid=XXXX&key=YYYY
-      const url = new URL(canal.drm_license_uri);
-      const keyId = url.searchParams.get("keyid");
-      const key   = url.searchParams.get("key");
-
-      if (keyId && key) {
-        drmConfig = {
-          clearKeys: {
-            [keyId]: key
-          }
-        };
-      } else {
-        // Si es URL de servidor de licencias
-        drmConfig = {
-          servers: {
-            "org.w3.clearkey": canal.drm_license_uri
-          }
-        };
-      }
-    }
-
-    player.configure({ drm: drmConfig });
-
-    try {
-      await player.load(canal.url);
-    } catch (e) {
-      console.error("Error cargando:", e);
-      document.getElementById("now-playing").textContent = "âŒ Error al cargar: " + canal.name;
-    }
-  }
-
-async function loadChannels() {
-    try {
-        // Hacemos la petición directamente a GitHub, sin usar corsproxy
-        const res = await fetch(JSON_URL);
+    // ESCUCHADOR DE ERRORES DE SHAKA (Manejo de recuperación en vivo)
+    player.addEventListener("error", async (e) => {
+        console.error("Shaka error detectado:", e.detail);
         
-        if (!res.ok) {
-            throw new Error(`Error al obtener el archivo (Código: ${res.status})`);
+        // Si el error es de red o severo y el video se detiene, intentamos recuperar
+        if (e.detail && (e.detail.category === 1 || e.detail.category === 3)) {
+            console.warn("Intentando recuperar la transmisión automáticamente...");
+            try {
+                // Intenta recuperar el streaming internamente sin recargar todo
+                await player.retry();
+            } catch (retryError) {
+                console.error("No se pudo recuperar con retry(), forzando recarga de canal...", retryError);
+                // Si el retry nativo falla, forzamos la recarga completa del stream actual
+                if (currentCanal) {
+                    setTimeout(() => playChannel(currentCanal), 2000); // Espera 2 segundos antes de insistir
+                }
+            }
+        }
+    });
+
+    // Detectar si el video se queda congelado por almacenamiento en búfer infinito (Stall)
+    video.addEventListener("waiting", () => {
+        console.log("Transmisión en búfer o pausada involuntariamente...");
+        // Si se queda congelado más de 5 segundos en vivo, forzamos salto al frente (Live Edge)
+        setTimeout(() => {
+            if (video.paused === false && player.isLive() && video.readyState < 3) {
+                console.warn("Forzando sincronización con la señal en vivo...");
+                video.currentTime = video.duration - 1; 
+            }
+        }, 5000);
+    });
+
+    async function playChannel(canal) {
+        currentCanal = canal; // Almacenamos el canal activo
+        document.getElementById("now-playing").textContent = "?? " + canal.name;
+        await player.unload();
+
+        player.getNetworkingEngine().clearAllRequestFilters();
+
+        if (canal.headers) {
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                if (canal.headers.Origin) request.headers["Origin"] = canal.headers.Origin;
+                if (canal.headers.Referer) request.headers["Referer"] = canal.headers.Referer;
+                if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
+            });
         }
 
-        const data = await res.json();
-        const container = document.getElementById("container");
-        container.innerHTML = "";
+        let drmConfig = {};
+        if (canal.drm_license_uri && canal.type === "CLEARKEY") {
+            try {
+                const url = new URL(canal.drm_license_uri);
+                const keyId = url.searchParams.get("keyid");
+                const key = url.searchParams.get("key");
 
-        if (!Array.isArray(data)) {
-            throw new Error("El JSON no tiene el formato de lista esperado.");
+                if (keyId && key) {
+                    drmConfig = { clearKeys: { [keyId]: key } };
+                } else {
+                    drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
+                }
+            } catch (e) {
+                drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
+            }
         }
 
-        data.forEach(categoria => {
-            const catLabel = document.createElement("div");
-            catLabel.className = "categoria";
-            catLabel.textContent = "📌 " + categoria.name;
-            container.appendChild(catLabel);
-
-            if (categoria.samples && Array.isArray(categoria.samples)) {
-                categoria.samples.forEach(canal => {
-                    const btn = document.createElement("button");
-                    btn.className = "canal-btn";
-
-                    const img = document.createElement("img");
-                    img.src = canal.icono || "";
-                    img.onerror = () => img.style.display = "none";
-
-                    btn.appendChild(img);
-                    btn.appendChild(document.createTextNode(canal.name));
-                    btn.onclick = () => playChannel(canal);
-                    container.appendChild(btn);
-                });
+        // CONFIGURACIÓN AVANZADA DE AGRESIVIDAD Y REINTENTOS
+        player.configure({ 
+            drm: drmConfig,
+            streaming: {
+                // Aumentamos los reintentos de red para fragmentos de video caídos
+                maxAttempts: 5,
+                baseDelay: 1000,
+                backoffFactor: 2,
+                // Incrementamos el búfer para aguantar microcortes de internet
+                bufferingGoal: 15,       // Intenta almacenar 15 segundos antes de reproducir
+                rebufferingGoal: 5,      // Si se vacía, necesita 5 segundos para reanudar
+                stallThreshold: 3        // Considera congelamiento si pasan 3 segundos sin datos
+            },
+            manifest: {
+                retryParameters: {
+                    maxAttempts: 4,      // Insiste en cargar el manifiesto si se cae la señal
+                    baseDelay: 1000,
+                    backoffFactor: 2
+                }
             }
         });
 
-    } catch (e) {
-        document.getElementById("container").textContent = "Error cargando canales: " + e.message;
+        try {
+            await player.load(canal.url);
+            document.getElementById("player-section").scrollIntoView({ behavior: 'smooth' });
+        } catch (e) {
+            console.error("Error cargando:", e);
+            document.getElementById("now-playing").textContent = "? Reintentando conexión con: " + canal.name;
+            // Si falla la carga inicial, insiste automáticamente tras 3 segundos
+            setTimeout(() => playChannel(canal), 3000);
+        }
     }
-}
 
+    async function loadChannels() {
+        try {
+            const res = await fetch(JSON_URL);
+            if (!res.ok) throw new Error(`Código: ${res.status}`);
+            const data = await res.json();
+            const container = document.getElementById("container");
+            container.innerHTML = "";
 
-  loadChannels();
+            if (!Array.isArray(data)) throw new Error("Formato inválido.");
+
+            data.forEach(categoria => {
+                const catLabel = document.createElement("div");
+                catLabel.className = "categoria";
+                catLabel.textContent = "?? " + categoria.name;
+                container.appendChild(catLabel);
+
+                if (categoria.samples && Array.isArray(categoria.samples)) {
+                    categoria.samples.forEach(canal => {
+                        const btn = document.createElement("button");
+                        btn.className = "canal-btn";
+
+                        const img = document.createElement("img");
+                        img.src = canal.icono || "";
+                        img.onerror = () => img.style.display = "none";
+
+                        btn.appendChild(img);
+                        btn.appendChild(document.createTextNode(canal.name));
+                        btn.onclick = () => playChannel(canal);
+                        container.appendChild(btn);
+                    });
+                }
+            });
+        } catch (e) {
+            document.getElementById("container").textContent = "Error cargando canales: " + e.message;
+        }
+    }
+
+    loadChannels();
 </script>
 </body>
 </html>
