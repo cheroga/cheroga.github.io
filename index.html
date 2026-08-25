@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -15,6 +15,7 @@
         #container { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px 10px 40px 10px; }
         .canal-btn { background: #1e1e1e; border: 1px solid #333; color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
         .canal-btn:hover { background: #f90; color: #000; }
+        .canal-btn.activo { background: #f90; color: #000; outline: 2px solid #fff; }
         .canal-btn img { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; }
         .categoria { width: 100%; padding: 15px 0 4px; color: #aaa; font-size: 0.85em; text-transform: uppercase; font-weight: bold; }
     </style>
@@ -25,56 +26,84 @@
 
     <div id="player-section">
         <div id="now-playing">Selecciona un canal</div>
-        <video id="video" controls autoplay></video>
+        <video id="video" controls autoplay muted></video>
     </div>
 
     <div id="container">Cargando canales...</div>
 
 <script>
     const JSON_URL = "https://raw.githubusercontent.com/cheroga/cheroga.github.io/refs/heads/master/canales_cache.json";
-    let currentCanal = null; // Guardar el canal actual para reintentos forzados
+    let currentCanal = null;
+    let retryTimeout = null;
+    let activeBtn = null; // Referencia al botón activo actual
 
     shaka.polyfill.installAll();
     const video = document.getElementById("video");
     const player = new shaka.Player(video);
 
-    // ESCUCHADOR DE ERRORES DE SHAKA (Manejo de recuperación en vivo)
+    // ESCUCHADOR DE ERRORES DE SHAKA
     player.addEventListener("error", async (e) => {
         console.error("Shaka error detectado:", e.detail);
-        
-        // Si el error es de red o severo y el video se detiene, intentamos recuperar
+
+        // Errores de red (Categoría 1) o de formato (Categoría 3)
         if (e.detail && (e.detail.category === 1 || e.detail.category === 3)) {
-            console.warn("Intentando recuperar la transmisión automáticamente...");
+            console.warn("Intentando recuperar de forma nativa...");
             try {
-                // Intenta recuperar el streaming internamente sin recargar todo
                 await player.retry();
             } catch (retryError) {
-                console.error("No se pudo recuperar con retry(), forzando recarga de canal...", retryError);
-                // Si el retry nativo falla, forzamos la recarga completa del stream actual
+                console.error("Fallo retry() nativo, programando reintento forzado...");
+
+                if (retryTimeout) clearTimeout(retryTimeout);
+
                 if (currentCanal) {
-                    setTimeout(() => playChannel(currentCanal), 2000); // Espera 2 segundos antes de insistir
+                    retryTimeout = setTimeout(() => {
+                        console.log("Ejecutando reintento forzado para:", currentCanal.name);
+                        playChannel(currentCanal, activeBtn);
+                    }, 3000);
                 }
             }
         }
     });
 
-    // Detectar si el video se queda congelado por almacenamiento en búfer infinito (Stall)
+    // FIX #1 + #2: Capturar canal en el momento del evento y usar seekable para live
     video.addEventListener("waiting", () => {
-        console.log("Transmisión en búfer o pausada involuntariamente...");
-        // Si se queda congelado más de 5 segundos en vivo, forzamos salto al frente (Live Edge)
+        const canalAlEsperar = currentCanal;
         setTimeout(() => {
-            if (video.paused === false && player.isLive() && video.readyState < 3) {
-                console.warn("Forzando sincronización con la señal en vivo...");
-                video.currentTime = video.duration - 1; 
+            if (currentCanal === canalAlEsperar && !video.paused && player.isLive() && video.readyState < 3) {
+                console.warn("Forzando sincronización en vivo por congelamiento...");
+                const seekable = video.seekable;
+                if (seekable.length > 0) {
+                    video.currentTime = seekable.end(seekable.length - 1) - 1;
+                }
             }
         }, 5000);
     });
 
-    async function playChannel(canal) {
-        currentCanal = canal; // Almacenamos el canal activo
-        document.getElementById("now-playing").textContent = "?? " + canal.name;
-        await player.unload();
+    async function playChannel(canal, btnElement) {
+        // Cancelar cualquier reintento pendiente del canal anterior
+        if (retryTimeout) {
+            clearTimeout(retryTimeout);
+            retryTimeout = null;
+        }
 
+        // FIX #9: Marcar botón activo visualmente
+        if (activeBtn) activeBtn.classList.remove("activo");
+        if (btnElement) {
+            btnElement.classList.add("activo");
+            activeBtn = btnElement;
+        }
+
+        currentCanal = canal;
+        document.getElementById("now-playing").textContent = "▶️ " + canal.name;
+
+        try {
+            await player.unload();
+        } catch (e) {
+            console.log("Aviso al descargar player:", e);
+        }
+
+        // FIX #3: Resetear configuración antes de aplicar la del nuevo canal
+        player.resetConfiguration();
         player.getNetworkingEngine().clearAllRequestFilters();
 
         if (canal.headers) {
@@ -102,45 +131,65 @@
             }
         }
 
-		// CONFIGURACIÓN CORREGIDA Y AVANZADA DE REINTENTOS
-		player.configure({ 
-			drm: drmConfig,
-			streaming: {
-				// CORRECCIÓN: Los intentos van dentro de retryParameters
-				retryParameters: {
-					maxAttempts: 5,
-					baseDelay: 1000,
-					backoffFactor: 2
-				},
-				// Incrementamos el búfer para aguantar microcortes de internet
-				bufferingGoal: 15,       // Intenta almacenar 15 segundos antes de reproducir
-				rebufferingGoal: 5,      // Si se vacía, necesita 5 segundos para reanudar
-				stallThreshold: 3        // Considera congelamiento si pasan 3 segundos sin datos
-			},
-			manifest: {
-				retryParameters: {
-					maxAttempts: 4,      // Insiste en cargar el manifiesto si se cae la señal
-					baseDelay: 1000,
-					backoffFactor: 2
-				}
-			}
-		});
+        player.configure({
+            drm: drmConfig,
+            streaming: {
+                retryParameters: {
+                    maxAttempts: 3,
+                    baseDelay: 1000,
+                    backoffFactor: 2
+                },
+                bufferingGoal: 12,
+                rebufferingGoal: 4,
+                stallThreshold: 3
+            },
+            manifest: {
+                retryParameters: {
+                    maxAttempts: 3,
+                    baseDelay: 1000,
+                    backoffFactor: 2
+                }
+            }
+        });
 
         try {
             await player.load(canal.url);
             document.getElementById("player-section").scrollIntoView({ behavior: 'smooth' });
+            // Resetear contador de reintentos al cargar exitosamente
+            canal._retries = 0;
         } catch (e) {
-            console.error("Error cargando:", e);
-            document.getElementById("now-playing").textContent = "? Reintentando conexión con: " + canal.name;
-            // Si falla la carga inicial, insiste automáticamente tras 3 segundos
-            setTimeout(() => playChannel(canal), 3000);
+            console.error("Error al cargar canal:", e);
+
+            if (currentCanal === canal) {
+                // FIX #8: Limitar reintentos para evitar loop infinito
+                canal._retries = (canal._retries || 0) + 1;
+
+                if (canal._retries <= 3) {
+                    document.getElementById("now-playing").textContent =
+                        `❌ Reintentando (${canal._retries}/3): ` + canal.name;
+                    retryTimeout = setTimeout(() => playChannel(canal, activeBtn), 4000);
+                } else {
+                    document.getElementById("now-playing").textContent =
+                        "❌ Canal no disponible: " + canal.name;
+                    canal._retries = 0;
+                    // Quitar estilo activo si el canal falló definitivamente
+                    if (activeBtn) activeBtn.classList.remove("activo");
+                    activeBtn = null;
+                }
+            }
         }
     }
 
     async function loadChannels() {
+        // FIX #7: Fetch con timeout de 8 segundos mediante AbortController
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+
         try {
-            const res = await fetch(JSON_URL);
-            if (!res.ok) throw new Error(`Código: ${res.status}`);
+            const res = await fetch(JSON_URL, { signal: controller.signal });
+            clearTimeout(fetchTimeout);
+
+            if (!res.ok) throw new Error(`Código: \${res.status}`);
             const data = await res.json();
             const container = document.getElementById("container");
             container.innerHTML = "";
@@ -150,7 +199,7 @@
             data.forEach(categoria => {
                 const catLabel = document.createElement("div");
                 catLabel.className = "categoria";
-                catLabel.textContent = "?? " + categoria.name;
+                catLabel.textContent = "📌 " + categoria.name;
                 container.appendChild(catLabel);
 
                 if (categoria.samples && Array.isArray(categoria.samples)) {
@@ -158,23 +207,34 @@
                         const btn = document.createElement("button");
                         btn.className = "canal-btn";
 
+                        // FIX #4 + #5: src vacío evitado, alt siempre presente
                         const img = document.createElement("img");
-                        img.src = canal.icono || "";
-                        img.onerror = () => img.style.display = "none";
+                        img.alt = canal.name;
+                        if (canal.icono) {
+                            img.src = canal.icono;
+                            img.onerror = () => img.style.display = "none";
+                        } else {
+                            img.style.display = "none";
+                        }
 
                         btn.appendChild(img);
                         btn.appendChild(document.createTextNode(canal.name));
-                        btn.onclick = () => playChannel(canal);
+                        btn.onclick = () => playChannel(canal, btn);
                         container.appendChild(btn);
                     });
                 }
             });
         } catch (e) {
-            document.getElementById("container").textContent = "Error cargando canales: " + e.message;
+            clearTimeout(fetchTimeout);
+            const msg = e.name === "AbortError"
+                ? "Tiempo de espera agotado al cargar canales."
+                : "Error cargando canales: " + e.message;
+            document.getElementById("container").textContent = msg;
         }
     }
 
     loadChannels();
+
 </script>
 </body>
 </html>
