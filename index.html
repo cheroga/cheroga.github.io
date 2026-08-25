@@ -102,27 +102,29 @@
             }
         }
 
-        // CONFIGURACIÓN AVANZADA DE AGRESIVIDAD Y REINTENTOS
-        player.configure({ 
-            drm: drmConfig,
-            streaming: {
-                // Aumentamos los reintentos de red para fragmentos de video caídos
-                maxAttempts: 5,
-                baseDelay: 1000,
-                backoffFactor: 2,
-                // Incrementamos el búfer para aguantar microcortes de internet
-                bufferingGoal: 15,       // Intenta almacenar 15 segundos antes de reproducir
-                rebufferingGoal: 5,      // Si se vacía, necesita 5 segundos para reanudar
-                stallThreshold: 3        // Considera congelamiento si pasan 3 segundos sin datos
-            },
-            manifest: {
-                retryParameters: {
-                    maxAttempts: 4,      // Insiste en cargar el manifiesto si se cae la señal
-                    baseDelay: 1000,
-                    backoffFactor: 2
-                }
-            }
-        });
+		// CONFIGURACIÓN CORREGIDA Y AVANZADA DE REINTENTOS
+		player.configure({ 
+			drm: drmConfig,
+			streaming: {
+				// CORRECCIÓN: Los intentos van dentro de retryParameters
+				retryParameters: {
+					maxAttempts: 5,
+					baseDelay: 1000,
+					backoffFactor: 2
+				},
+				// Incrementamos el búfer para aguantar microcortes de internet
+				bufferingGoal: 15,       // Intenta almacenar 15 segundos antes de reproducir
+				rebufferingGoal: 5,      // Si se vacía, necesita 5 segundos para reanudar
+				stallThreshold: 3        // Considera congelamiento si pasan 3 segundos sin datos
+			},
+			manifest: {
+				retryParameters: {
+					maxAttempts: 4,      // Insiste en cargar el manifiesto si se cae la señal
+					baseDelay: 1000,
+					backoffFactor: 2
+				}
+			}
+		});
 
         try {
             await player.load(canal.url);
