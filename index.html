@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ðŸ† FUTBOL 2026</title>
+  <title>FUTBOL 2026</title>
   <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<h1>ðŸ† FUTBOL 2026 - EN VIVO</h1>
+<h1>FUTBOL 2026 - EN VIVO</h1>
 
 <div id="player-section">
   <div id="now-playing">Selecciona un canal</div>
@@ -98,41 +98,51 @@
     }
   }
 
-  async function loadChannels() {
+async function loadChannels() {
     try {
-      // CORS workaround
-      const PROXY = "https://corsproxy.io/?";
-      const res = await fetch(PROXY + encodeURIComponent(JSON_URL));
-      const data = await res.json();
+        // Hacemos la petición directamente a GitHub, sin usar corsproxy
+        const res = await fetch(JSON_URL);
+        
+        if (!res.ok) {
+            throw new Error(`Error al obtener el archivo (Código: ${res.status})`);
+        }
 
-      const container = document.getElementById("container");
-      container.innerHTML = "";
+        const data = await res.json();
+        const container = document.getElementById("container");
+        container.innerHTML = "";
 
-      data.forEach(categoria => {
-        const catLabel = document.createElement("div");
-        catLabel.className = "categoria";
-        catLabel.textContent = "ðŸ“ " + categoria.name;
-        container.appendChild(catLabel);
+        if (!Array.isArray(data)) {
+            throw new Error("El JSON no tiene el formato de lista esperado.");
+        }
 
-        categoria.samples.forEach(canal => {
-          const btn = document.createElement("button");
-          btn.className = "canal-btn";
+        data.forEach(categoria => {
+            const catLabel = document.createElement("div");
+            catLabel.className = "categoria";
+            catLabel.textContent = "📌 " + categoria.name;
+            container.appendChild(catLabel);
 
-          const img = document.createElement("img");
-          img.src = canal.icono || "";
-          img.onerror = () => img.style.display = "none";
+            if (categoria.samples && Array.isArray(categoria.samples)) {
+                categoria.samples.forEach(canal => {
+                    const btn = document.createElement("button");
+                    btn.className = "canal-btn";
 
-          btn.appendChild(img);
-          btn.appendChild(document.createTextNode(canal.name));
-          btn.onclick = () => playChannel(canal);
-          container.appendChild(btn);
+                    const img = document.createElement("img");
+                    img.src = canal.icono || "";
+                    img.onerror = () => img.style.display = "none";
+
+                    btn.appendChild(img);
+                    btn.appendChild(document.createTextNode(canal.name));
+                    btn.onclick = () => playChannel(canal);
+                    container.appendChild(btn);
+                });
+            }
         });
-      });
 
     } catch (e) {
-      document.getElementById("container").textContent = "Error cargando canales: " + e.message;
+        document.getElementById("container").textContent = "Error cargando canales: " + e.message;
     }
-  }
+}
+
 
   loadChannels();
 </script>
