@@ -1,3 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FUTBOL 2026</title>
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0f0f0f; color: #fff; font-family: Arial, sans-serif; }
+        h1 { text-align: center; padding: 20px 20px 10px 20px; color: #f90; font-size: 1.4em; }
+        #player-section { position: sticky; top: 0; background: #0f0f0f; padding: 10px; z-index: 100; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); }
+        #now-playing { text-align: center; padding: 8px; color: #f90; font-size: 1em; }
+        video { width: 100%; max-width: 900px; display: block; margin: 0 auto; border-radius: 10px; background: #000; }
+        #container { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px 10px 40px 10px; }
+        .canal-btn { background: #1e1e1e; border: 1px solid #333; color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
+        .canal-btn:hover { background: #f90; color: #000; }
+        .canal-btn.activo { background: #f90; color: #000; outline: 2px solid #fff; }
+        .canal-btn img { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; }
+        .categoria { width: 100%; padding: 15px 0 4px; color: #aaa; font-size: 0.85em; text-transform: uppercase; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>FUTBOL 2026 - EN VIVO (update 25-08-2026)</h1>
+
+    <div id="player-section">
+        <div id="now-playing">Selecciona un canal</div>
+        <video id="video" controls autoplay muted></video>
+    </div>
+
+    <div id="container">Cargando canales...</div>
+
+<script>
+    const JSON_URL = "https://mensajerofm.org/json/nocache_channel.json";
+    let currentCanal = null;
+    let retryTimeout = null;
+    let activeBtn = null;
+    let consecutiveFails = 0; // Contador de fallos consecutivos
+
+    shaka.polyfill.installAll();
+      const video = document.getElementById("video");
+      let player = new shaka.Player(); 
+      player.attach(video);
+
+    player.addEventListener("error", async (e) => {
+        console.error("Shaka error detectado:", e.detail);
+
+        if (e.detail && (e.detail.category === 1 || e.detail.category === 3)) {
+            console.warn("Intentando recuperar de forma nativa...");
+            try {
+                await player.retry();
+            } catch (retryError) {
+                console.error("Fallo retry() nativo, programando reintento forzado...");
+                if (retryTimeout) clearTimeout(retryTimeout);
+                if (currentCanal) {
+                    retryTimeout = setTimeout(() => {
+                        playChannel(currentCanal, activeBtn);
+                    }, 3000);
+                }
+            }
+        }
+    });
+
+    video.addEventListener("waiting", () => {
+        const canalAlEsperar = currentCanal;
+        setTimeout(() => {
+            if (currentCanal === canalAlEsperar && !video.paused && player.isLive() && video.readyState < 3) {
+                console.warn("Forzando sincronización en vivo por congelamiento...");
+                const seekable = video.seekable;
+                if (seekable.length > 0) {
+                    video.currentTime = seekable.end(seekable.length - 1) - 1;
+                }
+            }
+        }, 5000);
+    });
+
+    // Función separada para resetear el player cuando está corrupto
+    async function resetPlayer() {
+        console.warn("Reseteando player por fallos acumulados...");
+        try {
+            await player.destroy();
+        } catch (e) {
+            console.log("Aviso al destruir player:", e);
+        }
+        player = new shaka.Player(video); // Recrear adjuntado directamente al video, sin await
+        player.addEventListener("error", async (e) => {
+            console.error("Shaka error detectado:", e.detail);
+            if (e.detail && (e.detail.category === 1 || e.detail.category === 3)) {
+                try {
+                    await player.retry();
+                } catch {
+                    if (retryTimeout) clearTimeout(retryTimeout);
+                    if (currentCanal) {
+                        retryTimeout = setTimeout(() => playChannel(currentCanal, activeBtn), 3000);
+                    }
+                }
+            }
+        });
+        consecutiveFails = 0;
+    }
+
+    async function playChannel(canal, btnElement) {
+        if (retryTimeout) {
+            clearTimeout(retryTimeout);
+            retryTimeout = null;
+        }
+
+        if (activeBtn) activeBtn.classList.remove("activo");
+        if (btnElement) {
+            btnElement.classList.add("activo");
+            activeBtn = btnElement;
+        }
+
+        currentCanal = canal;
+        document.getElementById("now-playing").textContent = "▶️ " + canal.name;
+
+        // Si hubo 2 o más fallos consecutivos, resetear el player antes de continuar
+        if (consecutiveFails >= 2) {
+            await resetPlayer();
+        }
+
+        try {
+            await player.unload();
+        } catch (e) {
+            console.log("Aviso al descargar player:", e);
+        }
+
+        player.resetConfiguration();
+        player.getNetworkingEngine().clearAllRequestFilters();
+
+        if (canal.headers) {
+            player.getNetworkingEngine().registerRequestFilter((type, request) => {
+                if (canal.headers.Origin) request.headers["Origin"] = canal.headers.Origin;
+                if (canal.headers.Referer) request.headers["Referer"] = canal.headers.Referer;
+                if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
+            });
+        }
+
+        let drmConfig = {};
+        if (canal.drm_license_uri && canal.type === "CLEARKEY") {
+            try {
+                const url = new URL(canal.drm_license_uri);
+                const keyId = url.searchParams.get("keyid");
+                const key = url.searchParams.get("key");
+                if (keyId && key) {
+                    drmConfig = { clearKeys: { [keyId]: key } };
+                } else {
+                    drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
+                }
+            } catch (e) {
+                drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
+            }
+        }
+
+        player.configure({
+            drm: drmConfig,
+            streaming: {
+                retryParameters: { maxAttempts: 3, baseDelay: 1000, backoffFactor: 2 },
+                bufferingGoal: 12,
+                rebufferingGoal: 4,
+                stallThreshold: 3
+            },
+            manifest: {
+                retryParameters: { maxAttempts: 3, baseDelay: 1000, backoffFactor: 2 }
+            }
+        });
+
+        try {
+            await player.load(canal.url);
+            document.getElementById("player-section").scrollIntoView({ behavior: 'smooth' });
+            canal._retries = 0;
+            consecutiveFails = 0; // Resetear contador al cargar exitosamente
+        } catch (e) {
+            console.error("Error al cargar canal:", e);
+            consecutiveFails++; // Incrementar contador de fallos consecutivos
+
+            if (currentCanal === canal) {
+                canal._retries = (canal._retries || 0) + 1;
+
+                if (canal._retries <= 3) {
+                    document.getElementById("now-playing").textContent =
+                        `❌ Reintentando (${canal._retries}/3): ` + canal.name;
+                    retryTimeout = setTimeout(() => playChannel(canal, activeBtn), 4000);
+                } else {
+                    document.getElementById("now-playing").textContent =
+                        "❌ Canal no disponible: " + canal.name;
+                    canal._retries = 0;
+                    if (activeBtn) activeBtn.classList.remove("activo");
+                    activeBtn = null;
+                }
+            }
+        }
+    }
+
 async function loadChannels() {
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), 8000);
@@ -48,3 +243,9 @@ async function loadChannels() {
     document.getElementById("container").textContent = msg;
   }
 }
+
+
+    loadChannels();
+</script>
+</body>
+</html>
