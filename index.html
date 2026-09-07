@@ -192,54 +192,56 @@
         }
     }
 
-    async function loadChannels() {
-        const controller = new AbortController();
-        const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+   async function loadChannels() {
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+  
+  try {
+    // Generamos un número único basado en la hora exacta para romper el caché
+    const cacheBuster = new Date().getTime();
+    const urlConNoCache = `${JSON_URL}?nocache=${cacheBuster}`;
 
-        try {
-            const res = await fetch(JSON_URL, { signal: controller.signal });
-            clearTimeout(fetchTimeout);
-            if (!res.ok) throw new Error(`Código: \${res.status}`);
-            const data = await res.json();
-            const container = document.getElementById("container");
-            container.innerHTML = "";
-            if (!Array.isArray(data)) throw new Error("Formato inválido.");
-
-            data.forEach(categoria => {
-                const catLabel = document.createElement("div");
-                catLabel.className = "categoria";
-                catLabel.textContent = "📌 " + categoria.name;
-                container.appendChild(catLabel);
-
-                if (categoria.samples && Array.isArray(categoria.samples)) {
-                    categoria.samples.forEach(canal => {
-                        const btn = document.createElement("button");
-                        btn.className = "canal-btn";
-
-                        const img = document.createElement("img");
-                        img.alt = canal.name;
-                        if (canal.icono) {
-                            img.src = canal.icono;
-                            img.onerror = () => img.style.display = "none";
-                        } else {
-                            img.style.display = "none";
-                        }
-
-                        btn.appendChild(img);
-                        btn.appendChild(document.createTextNode(canal.name));
-                        btn.onclick = () => playChannel(canal, btn);
-                        container.appendChild(btn);
-                    });
-                }
-            });
-        } catch (e) {
-            clearTimeout(fetchTimeout);
-            const msg = e.name === "AbortError"
-                ? "Tiempo de espera agotado al cargar canales."
-                : "Error cargando canales: " + e.message;
-            document.getElementById("container").textContent = msg;
-        }
-    }
+    // Hacemos el fetch a la URL modificada
+    const res = await fetch(urlConNoCache, { signal: controller.signal });
+    clearTimeout(fetchTimeout);
+    
+    if (!res.ok) throw new Error(`Código: ${res.status}`);
+    const data = await res.json();
+    const container = document.getElementById("container");
+    container.innerHTML = "";
+    
+    if (!Array.isArray(data)) throw new Error("Formato inválido.");
+    data.forEach(categoria => {
+      const catLabel = document.createElement("div");
+      catLabel.className = "categoria";
+      catLabel.textContent = "📌 " + categoria.name;
+      container.appendChild(catLabel);
+      
+      if (categoria.samples && Array.isArray(categoria.samples)) {
+        categoria.samples.forEach(canal => {
+          const btn = document.createElement("button");
+          btn.className = "canal-btn";
+          const img = document.createElement("img");
+          img.alt = canal.name;
+          if (canal.icono) {
+            img.src = canal.icono;
+            img.onerror = () => img.style.display = "none";
+          } else {
+            img.style.display = "none";
+          }
+          btn.appendChild(img);
+          btn.appendChild(document.createTextNode(canal.name));
+          btn.onclick = () => playChannel(canal, btn);
+          container.appendChild(btn);
+        });
+      }
+    });
+  } catch (e) {
+    clearTimeout(fetchTimeout);
+    const msg = e.name === "AbortError" ? "Tiempo de espera agotado al cargar canales." : "Error cargando canales: " + e.message;
+    document.getElementById("container").textContent = msg;
+  }
+}
 
     loadChannels();
 </script>
