@@ -16,7 +16,7 @@ jobs:
       - name: Descargar JSON fresco de InMotion
         run: |
           # Descarga el archivo simulando ser un navegador Chrome para saltar ModSecurity
-          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "https://mensajerofm.org/json/nocache_channel.json" -o home_cache.json
+          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "https://mensajerofm.org/json/nocache_channel.json" -o canales_cache.json
 
       - name: Guardar y subir cambios a GitHub
         run: |
