@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineFlex 2026 - Películas</title>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #141414; color: #fff; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; overflow-x: hidden; }
+        
+        /* Navbar superior estilo Netflix */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 4%;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 200;
+            transition: background 0.3s;
+        }
+        header.scrolled { background: #141414; border-bottom: 1px solid #252525; }
+        .logo { color: #e50914; font-size: 1.6em; letter-spacing: 1px; font-weight: bold; text-decoration: none; }
+        
+        .nav-btn {
+            background: #f90;
+            color: #000;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: transform 0.2s;
+        }
+        .nav-btn:hover { transform: scale(1.05); }
+
+        /* Contenedor del Reproductor Principal */
+        #player-wrapper {
+            display: none;
+            background: #000;
+            padding: 80px 4% 20px 4%;
+            border-bottom: 2px solid #222;
+        }
+        video { width: 100%; max-width: 900px; display: block; margin: 0 auto; border-radius: 6px; background: #000; box-shadow: 0 0 25px rgba(0,0,0,0.9); }
+
+        /* Detalles de la Película seleccionada */
+        #movie-info-display {
+            max-width: 900px;
+            margin: 20px auto 0 auto;
+            text-align: left;
+            background: #181818;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8);
+        }
+        #movie-info-display h2 { color: #fff; font-size: 1.6em; margin-bottom: 8px; }
+        .meta-data { color: #46d369; font-weight: bold; font-size: 0.95em; margin-bottom: 12px; }
+        .meta-data span { color: #aaa; margin-left: 15px; font-weight: normal; }
+        #movie-info-display p { color: #cccccc; font-size: 1em; line-height: 1.6; }
+
+        /* Filas de Categorías Horizontales */
+        #main-content { margin-top: 100px; padding: 0 4% 50px 4%; }
+        .row { margin-bottom: 30px; }
+        .row-title { font-size: 1.3em; color: #fff; margin-bottom: 12px; font-weight: bold; }
+        .row-posters {
+            display: flex;
+            overflow-x: auto;
+            overflow-y: hidden;
+            gap: 14px;
+            padding: 10px 0;
+            scroll-behavior: smooth;
+        }
+        .row-posters::-webkit-scrollbar { height: 6px; }
+        .row-posters::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        
+        /* Tarjetas de Portada */
+        .movie-card {
+            flex: 0 0 auto;
+            width: 150px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #222;
+        }
+        .movie-card:hover { transform: scale(1.06); z-index: 10; }
+        .movie-card img { width: 100%; height: 225px; object-fit: cover; display: block; }
+        
+        .movie-title-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+            padding: 25px 8px 8px 8px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+
+    <header id="navbar">
+        <a href="#" class="logo">CineFlex 2026</a>
+        <a href="index.html" class="nav-btn">⚽ Ver Fútbol En Vivo</a>
+    </header>
+
+    <div id="player-wrapper">
+        <video id="video" controls autoplay></video>
+        <div id="movie-info-display">
+            <h2 id="view-title">Título de la Película</h2>
+            <div class="meta-data">
+                Año: <span id="view-anio">-</span>
+                <span id="view-duracion">-</span>
+                <span id="view-genero" style="color: #f90; margin-left: 20px;">-</span>
+            </div>
+            <p id="view-desc">Selecciona una película de la lista inferior para comenzar la reproducción.</p>
+        </div>
+    </div>
+
+    <div id="main-content">Cargando catálogo de películas...</div>
+
+<script>
+    const MOVIE_JSON = "https://raw.githubusercontent.com/cheroga/cheroga.github.io/refs/heads/master/taanga.json";
+    
+    shaka.polyfill.installAll();
+    const video = document.getElementById("video");
+    let player = new shaka.Player();
+    player.attach(video);
+
+    // Efecto de scroll en barra de navegación
+    window.addEventListener('scroll', () => {
+        const navbar = document.getElementById('navbar');
+        if (window.scrollY > 20) navbar.classList.add('scrolled');
+        else navbar.classList.remove('scrolled');
+    });
+
+    async function playMovie(movie) {
+        const wrapper = document.getElementById("player-wrapper");
+        wrapper.style.display = "block";
+        
+        // Mapear metadatos del JSON
+        document.getElementById("view-title").textContent = movie.name;
+        document.getElementById("view-anio").textContent = movie.anio || "N/A";
+        document.getElementById("view-duracion").textContent = movie.duracion ? ` | ${movie.duracion}` : "";
+        document.getElementById("view-genero").textContent = movie.genero || "";
+        document.getElementById("view-desc").textContent = movie.descripcion || "Sin descripción disponible.";
+
+        wrapper.scrollIntoView({ behavior: 'smooth' });
+
+        try { 
+            await player.unload(); 
+        } catch(e){}
+        
+        player.resetConfiguration();
+        player.configure({
+            streaming: {
+                bufferingGoal: 15,
+                rebufferingGoal: 5,
+                retryParameters: { maxAttempts: 2 }
+            }
+        });
+
+        try {
+            await player.load(movie.url);
+        } catch (e) {
+            console.warn("Shaka no pudo procesar el stream (puede ser un formato .ts o directo). Usando fallback nativo...");
+            // Fallback para reproducir archivos multimedia directos o .ts compatibles
+            player.unload();
+            video.src = movie.url;
+            video.load();
+            video.play().catch(err => console.error("Error en reproducción nativa:", err));
+        }
+    }
+
+    async function loadCatalog() {
+        try {
+            const cacheBuster = new Date().getTime();
+            const res = await fetch(`${MOVIE_JSON}?nocache=${cacheBuster}`);
+            if (!res.ok) throw new Error("No se pudo obtener el archivo JSON.");
+            
+            const catalogData = await res.json();
+            const mainContent = document.getElementById("main-content");
+            mainContent.innerHTML = "";
+
+            if (!Array.isArray(catalogData)) throw new Error("El formato del JSON no es un array válido.");
+
+            catalogData.forEach(rowCategory => {
+                const rowDiv = document.createElement("div");
+                rowDiv.className = "row";
+
+                const rowTitle = document.createElement("div");
+                rowTitle.className = "row-title";
+                rowTitle.textContent = "🍿 " + rowCategory.name;
+                rowDiv.appendChild(rowTitle);
+
+                const postersDiv = document.createElement("div");
+                postersDiv.className = "row-posters";
+
+                if (rowCategory.samples) {
+                    rowCategory.samples.forEach(movie => {
+                        const card = document.createElement("div");
+                        card.className = "movie-card";
+                        
+                        const img = document.createElement("img");
+                        // Prioriza la imagen vertical del JSON, si falla genera un placeholder elegante
+                        img.src = movie.icono || "https://placeholder.com" + encodeURIComponent(movie.name);
+                        img.alt = movie.name;
+                        img.onerror = () => { img.src = "https://placeholder.com"; };
+
+                        const overlay = document.createElement("div");
+                        overlay.className = "movie-title-overlay";
+                        overlay.textContent = movie.name;
+
+                        card.appendChild(img);
+                        card.appendChild(overlay);
+                        card.onclick = () => playMovie(movie);
+                        postersDiv.appendChild(card);
+                    });
+                }
+                rowDiv.appendChild(postersDiv);
+                mainContent.appendChild(rowDiv);
+            });
+        } catch (e) {
+            document.getElementById("main-content").innerHTML = `<div style="padding:20px; color:#e50914; font-weight:bold;">Error al cargar las películas: ${e.message}</div>`;
+        }
+    }
+    
+    loadCatalog();
+</script>
+</body>
+</html>
