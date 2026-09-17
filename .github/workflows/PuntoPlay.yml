@@ -90,7 +90,7 @@ jobs:
       - name: Publicar en rama canales
         run: |
           set -e
-          mkdir -p /tmp/pub && cp nocache_channel.json /tmp/pub/nocache_channel.json
+          mkdir -p /tmp/pub && cp canales.json /tmp/pub/canales.json
           cd /tmp/pub
           git init -q
           git remote add origin "https://cheroga:${{ secrets.PAT_TOKEN }}@github.com/cheroga/cheroga.github.io.git"
@@ -99,4 +99,4 @@ jobs:
           git -c user.name="tapego-bot" -c user.email="bot@users.noreply.github.com" \
             commit -q -m "canales \$(date -u '+%Y-%m-%d %H:%M UTC')"
           git push --force --set-upstream origin canales
-          echo "✅ Publicado"
+          echo "✅ Publicado en: https://raw.githubusercontent.com/cheroga/cheroga.github.io/canales/canales.json"
