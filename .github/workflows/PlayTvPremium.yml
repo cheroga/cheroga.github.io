@@ -1,14 +1,3 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# WORKFLOW PARA EL REPO guillen1998/updateapp
-#
-# Descarga los canales desde tapego.lat con firma HMAC y los publica en la
-# rama "canales" de este repositorio. El resultado es accesible en:
-#
-#   https://raw.githubusercontent.com/guillen1998/updateapp/canales/nocache_channel.json
-#
-# Se ejecuta automáticamente cada 15 minutos.
-# ─────────────────────────────────────────────────────────────────────────────
-
 name: PlayTvPremium — canales
 
 on:
@@ -17,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: tapego-canales
+  group: PlayTvPremium-canales
   cancel-in-progress: true
 
 permissions:
@@ -27,12 +16,10 @@ jobs:
   canales:
     runs-on: ubuntu-latest
     steps:
-      # 1. Configurar Python
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 2. Bajar canales y firmar con HMAC
       - name: Bajar canales
         run: |
           python3 - <<'PY'
@@ -45,24 +32,24 @@ jobs:
           BASE   = 'https://tapego.lat'
 
           def sign(method, path, body=b''):
-              ts       = str(int(time.time()))
-              nonce    = uuid.uuid4().hex
+              ts        = str(int(time.time()))
+              nonce     = uuid.uuid4().hex
               body_hash = hashlib.sha256(body).hexdigest()
-              msg      = '\n'.join([method, path, ts, nonce, body_hash, DEVICE, CERT])
-              sig      = hmac.new(KEY, msg.encode('utf-8'), hashlib.sha256).hexdigest()
+              msg       = '\n'.join([method, path, ts, nonce, body_hash, DEVICE, CERT])
+              sig       = hmac.new(KEY, msg.encode('utf-8'), hashlib.sha256).hexdigest()
               return ts, nonce, sig
 
           def get(path):
               ts, nonce, sig = sign('GET', path)
               req = urllib.request.Request(BASE + path)
-              req.add_header('Authorization',    f'Bearer {TOKEN}')
-              req.add_header('X-App-Timestamp',  ts)
-              req.add_header('X-App-Nonce',      nonce)
-              req.add_header('X-App-Cert',       CERT)
-              req.add_header('X-App-Signature',  sig)
-              req.add_header('X-Device-Id',      DEVICE)
-              req.add_header('Accept',           'application/json')
-              req.add_header('User-Agent',       'PlayPremium')
+              req.add_header('Authorization',   f'Bearer {TOKEN}')
+              req.add_header('X-App-Timestamp', ts)
+              req.add_header('X-App-Nonce',     nonce)
+              req.add_header('X-App-Cert',      CERT)
+              req.add_header('X-App-Signature', sig)
+              req.add_header('X-Device-Id',     DEVICE)
+              req.add_header('Accept',          'application/json')
+              req.add_header('User-Agent',      'PlayPremium')
               with urllib.request.urlopen(req, timeout=40) as r:
                   return json.loads(r.read())
 
@@ -74,19 +61,18 @@ jobs:
           print("✅ Canales descargados:", len(data) if isinstance(data, list) else "ok")
           PY
 
-      # 3. Publicar en la rama "canales" (force push, solo la última versión)
       - name: Publicar en rama canales
         env:
-          GH_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: \${{ secrets.PAT_TOKEN }}
         run: |
           set -e
           mkdir -p /tmp/pub && cp nocache_channel.json /tmp/pub/nocache_channel.json
           cd /tmp/pub
           git init -q
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/cheroga/cheroga.github.io.git"
           git checkout -q -b canales
           git add nocache_channel.json
           git -c user.name="tapego-bot" -c user.email="bot@users.noreply.github.com" \
             commit -q -m "canales \$(date -u '+%Y-%m-%d %H:%M UTC')"
           git push --force --set-upstream origin canales
-          echo "✅ Publicado en: https://raw.githubusercontent.com/${{ github.repository }}/canales/nocache_channel.json"
+          echo "✅ Publicado en: https://raw.githubusercontent.com/cheroga/cheroga.github.io/canales/nocache_channel.json"
