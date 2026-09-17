@@ -9,7 +9,7 @@
 # Se ejecuta automáticamente cada 15 minutos.
 # ─────────────────────────────────────────────────────────────────────────────
 
-name: TapeGo — canales
+name: PlayTvPremium — canales
 
 on:
   schedule:
