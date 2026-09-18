@@ -101,4 +101,4 @@ jobs:
           git -c user.name="tapego-bot" -c user.email="bot@users.noreply.github.com" \
             commit -q -m "canales \$(date -u '+%Y-%m-%d %H:%M UTC')"
           git push --force --set-upstream origin canales
-          echo "✅ Publicado en: https://raw.githubusercontent.com/cheroga/cheroga.github.io/canales/canales.json"
+          echo "✅ Publicado"
