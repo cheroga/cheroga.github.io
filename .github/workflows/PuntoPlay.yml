@@ -96,9 +96,9 @@ jobs:
           cd /tmp/pub
           git init -q
           git remote add origin "https://cheroga:${{ secrets.PAT_TOKEN }}@github.com/cheroga/cheroga.github.io.git"
-          git checkout -q -b canales
+          git checkout -q -b puntoplay
           git add canales.json
           git -c user.name="tapego-bot" -c user.email="bot@users.noreply.github.com" \
             commit -q -m "canales \$(date -u '+%Y-%m-%d %H:%M UTC')"
-          git push --force --set-upstream origin canales
+          git push --force --set-upstream origin puntoplay
           echo "✅ Publicado"
