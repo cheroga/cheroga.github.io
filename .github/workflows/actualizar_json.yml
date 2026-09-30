@@ -1,33 +1,80 @@
-name: Actualizar Canales JSON
+# ─────────────────────────────────────────────────────────────────────────────
+# WORKFLOW COMPLETO PARA EL REPO PÚBLICO
+#
+# Descarga el JSON de mensajerofm, filtra solo los grupos deseados y lo
+# publica en la rama "puntoplay" de ESTE mismo repositorio (público).
+# Resultado accesible en:
+# https://raw.githubusercontent.com/cheroga/cheroga.github.io/refs/heads/puntoplay/canales.json
+# Se ejecuta MANUALMENTE o cada hora automáticamente.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Punto Play — canales (público)
 
 on:
+  workflow_dispatch:
   schedule:
-    # Se ejecuta cada 15 minutos de forma automática
-    - cron: '*/15 * * * *'
-  workflow_dispatch: # Te permite ejecutarlo manualmente desde GitHub si quieres probar
+    - cron: '0 */1 * * *'
+
+concurrency:
+  group: puntoplay-canales
+  cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
-  actualizar:
+  canales:
     runs-on: ubuntu-latest
     steps:
-      - name: Clonar el repositorio
-        uses: actions/checkout@v4
+      # 1. Configurar Python
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-      - name: Descargar JSON fresco de InMotion
+      # 2. Bajar, filtrar y guardar canales
+      - name: Bajar y filtrar canales
         run: |
-          # Descarga el archivo simulando ser un navegador Chrome para saltar ModSecurity
-          curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" "https://mensajerofm.org/json/nocache_channel.json" -o canales_cache.json
+          python3 - <<'PY'
+          import json, urllib.request
 
-      - name: Guardar y subir cambios a GitHub
+          UA     = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0 Safari/537.36"
+          SRC    = "https://mensajerofm.org/json/nocache_channel.json"
+          GRUPOS = {"EVENTOS PY", "CANALES PARAGUAY OP2"}
+
+          req  = urllib.request.Request(SRC, headers={"User-Agent": UA})
+          data = json.loads(urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "replace"))
+
+          # Estructura: lista de objetos con "name" y "samples"
+          filtrado = [g for g in data if isinstance(g, dict) and g.get("name") in GRUPOS]
+
+          with open("canales.json", "w", encoding="utf-8") as f:
+              json.dump(filtrado, f, ensure_ascii=False, indent=2)
+
+          print(f"✅ Grupos guardados: {len(filtrado)}")
+          for g in filtrado:
+              print(f"   · {g['name']} — {len(g.get('samples', []))} canales")
+
+          if len(filtrado) < len(GRUPOS):
+              encontrados = {g["name"] for g in filtrado}
+              faltantes   = GRUPOS - encontrados
+              print(f"⚠️  No encontrados: {faltantes}")
+              print("   Grupos disponibles en la fuente:")
+              for g in data:
+                  if isinstance(g, dict) and "name" in g:
+                      print(f"     · {g['name']}")
+          PY
+
+      # 3. Publicar en la rama "puntoplay" (force push — solo la última versión)
+      - name: Publicar en rama puntoplay
         run: |
-          git config --global user.name "GitHub Action Bot"
-          git config --global user.email "actions@github.com"
-          
-          # Verificar si hay cambios reales en el archivo para no hacer commits vacíos
-          if git diff --exit-code canales_cache.json; then
-            echo "No hay cambios en los canales."
-          else
-            git add canales_cache.json
-            git commit -m "Automatizado: Canales actualizados desde el servidor"
-            git push
-          fi
+          set -e
+          mkdir -p /tmp/pub && cp canales.json /tmp/pub/canales.json
+          cd /tmp/pub
+          git init -q
+          git remote add origin "https://cheroga:${{ secrets.PAT_TOKEN }}@github.com/cheroga/cheroga.github.io.git"
+          git checkout -q -b puntoplay
+          git add canales.json
+          git -c user.name="tapego-bot" -c user.email="bot@users.noreply.github.com" \
+            commit -q -m "canales \$(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push --force --set-upstream origin puntoplay
+          echo "✅ Publicado"
