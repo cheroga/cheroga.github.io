@@ -7,149 +7,316 @@
     <script src="https://cdn.jsdelivr.net/npm/shaka-player@4.7.11/dist/shaka-player.compiled.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0f0f0f; color: #fff; font-family: Arial, sans-serif; }
-        h1 { text-align: center; padding: 20px 20px 10px 20px; color: #f90; font-size: 1.4em; }
-        #player-section { position: sticky; top: 0; background: #0f0f0f; padding: 10px; z-index: 100; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); }
-        #now-playing { text-align: center; padding: 8px; color: #f90; font-size: 1em; }
-        video { width: 100%; max-width: 900px; display: block; margin: 0 auto; border-radius: 10px; background: #000; }
-        #container { display: flex; flex-wrap: wrap; gap: 10px; padding: 15px 10px 40px 10px; }
-        .canal-btn { background: #1e1e1e; border: 1px solid #333; color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 0.9em; }
-        .canal-btn:hover { background: #f90; color: #000; }
-        .canal-btn.activo { background: #f90; color: #000; outline: 2px solid #fff; }
-        .canal-btn img { width: 32px; height: 32px; object-fit: contain; border-radius: 4px; }
-        .categoria { width: 100%; padding: 15px 0 4px; color: #aaa; font-size: 0.85em; text-transform: uppercase; font-weight: bold; }
+
+        body {
+            background: #0f0f0f;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            height: 100dvh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── HEADER ── */
+        #header {
+            background: #161616;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 2px solid #f90;
+            flex-shrink: 0;
+        }
+        #header h1 {
+            color: #f90;
+            font-size: 1.1em;
+            flex: 1;
+            text-align: center;
+        }
+
+        /* ── LAYOUT PRINCIPAL ── */
+        #main {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── PANEL IZQUIERDO: REPRODUCTOR ── */
+        #player-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0f0f0f;
+            overflow: hidden;
+        }
+
+        #now-playing {
+            padding: 8px 14px;
+            color: #f90;
+            font-size: 0.95em;
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+        }
+
+        #video-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: #000;
+        }
+
+        /* ── PANEL DERECHO: LISTA DE CANALES ── */
+        #sidebar {
+            width: 280px;
+            min-width: 220px;
+            max-width: 320px;
+            background: #161616;
+            border-left: 2px solid #2a2a2a;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        #search-box {
+            padding: 10px;
+            background: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+            flex-shrink: 0;
+        }
+
+        #search-input {
+            width: 100%;
+            padding: 7px 10px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #0f0f0f;
+            color: #fff;
+            font-size: 0.85em;
+            outline: none;
+        }
+        #search-input:focus { border-color: #f90; }
+        #search-input::placeholder { color: #555; }
+
+        #channel-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 0 20px 0;
+        }
+
+        /* Scrollbar personalizado */
+        #channel-list::-webkit-scrollbar { width: 5px; }
+        #channel-list::-webkit-scrollbar-track { background: #161616; }
+        #channel-list::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+        #channel-list::-webkit-scrollbar-thumb:hover { background: #f90; }
+
+        .categoria {
+            padding: 10px 12px 4px 12px;
+            color: #f90;
+            font-size: 0.72em;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+            border-top: 1px solid #222;
+            margin-top: 4px;
+        }
+        .categoria:first-child { border-top: none; margin-top: 0; }
+
+        .canal-btn {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #1e1e1e;
+            color: #ddd;
+            padding: 9px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85em;
+            text-align: left;
+            transition: background 0.15s;
+        }
+        .canal-btn:hover { background: #222; color: #fff; }
+        .canal-btn.activo {
+            background: #2a1f00;
+            color: #f90;
+            border-left: 3px solid #f90;
+        }
+        .canal-btn img {
+            width: 30px;
+            height: 30px;
+            object-fit: contain;
+            border-radius: 4px;
+            flex-shrink: 0;
+            background: #111;
+        }
+        .canal-nombre {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ── RESPONSIVE: móvil ── */
+        @media (max-width: 640px) {
+            body { overflow: auto; }
+            #main { flex-direction: column; overflow: visible; }
+            #sidebar {
+                width: 100%;
+                max-width: 100%;
+                border-left: none;
+                border-top: 2px solid #2a2a2a;
+                height: 40dvh;
+            }
+            #video-wrapper { min-height: 200px; }
+        }
     </style>
 </head>
 <body>
 
-    <h1>FUTBOL 2026 - EN VIVO (update 17-09-2026)</h1>
+<div id="header">
+    <h1>⚽ FUTBOL 2026 — EN VIVO</h1>
+</div>
 
-    <div id="player-section">
-        <div id="now-playing">Selecciona un canal</div>
-        <video id="video" controls autoplay muted></video>
+<div id="main">
+
+    <!-- REPRODUCTOR -->
+    <div id="player-panel">
+        <div id="now-playing">Seleccioná un canal</div>
+        <div id="video-wrapper">
+            <video id="video" controls autoplay muted playsinline></video>
+        </div>
     </div>
 
-    <div id="container">Cargando canales...</div>
+    <!-- LISTA DE CANALES -->
+    <div id="sidebar">
+        <div id="search-box">
+            <input id="search-input" type="search" placeholder="🔍 Buscar canal..." autocomplete="off" />
+        </div>
+        <div id="channel-list">Cargando canales...</div>
+    </div>
+
+</div>
 
 <script>
     const JSON_URL = "https://raw.githubusercontent.com/cheroga/cheroga.github.io/refs/heads/puntoplay/canales.json";
-    let currentCanal = null;
-    let retryTimeout = null;
-    let activeBtn = null;
-    let consecutiveFails = 0; // Contador de fallos consecutivos
+
+    // ── Detección de Safari / Mac para HLS nativo ──
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const supportsHLS = video => video.canPlayType("application/vnd.apple.mpegurl") !== "";
+
+    let currentCanal   = null;
+    let retryTimeout   = null;
+    let activeBtn      = null;
+    let consecutiveFails = 0;
+    let allData        = [];   // guardamos los datos para el buscador
 
     shaka.polyfill.installAll();
-      const video = document.getElementById("video");
-      let player = new shaka.Player(); 
-      player.attach(video);
+    const video = document.getElementById("video");
+    let player = new shaka.Player();
+    player.attach(video);
 
-    player.addEventListener("error", async (e) => {
-        console.error("Shaka error detectado:", e.detail);
-
-        if (e.detail && (e.detail.category === 1 || e.detail.category === 3)) {
-            console.warn("Intentando recuperar de forma nativa...");
-            try {
-                await player.retry();
-            } catch (retryError) {
-                console.error("Fallo retry() nativo, programando reintento forzado...");
-                if (retryTimeout) clearTimeout(retryTimeout);
-                if (currentCanal) {
-                    retryTimeout = setTimeout(() => {
-                        playChannel(currentCanal, activeBtn);
-                    }, 3000);
+    // ── Registro de error reutilizable ──
+    function attachShakaErrorHandler(p) {
+        p.addEventListener("error", async (e) => {
+            console.error("Shaka error:", e.detail);
+            if (e.detail && (e.detail.category === 1 || e.detail.category === 3)) {
+                try { await p.retry(); }
+                catch {
+                    if (retryTimeout) clearTimeout(retryTimeout);
+                    if (currentCanal) retryTimeout = setTimeout(() => playChannel(currentCanal, activeBtn), 3000);
                 }
             }
-        }
-    });
+        });
+    }
+    attachShakaErrorHandler(player);
 
+    // ── Reconexión en vivo al congelar ──
     video.addEventListener("waiting", () => {
-        const canalAlEsperar = currentCanal;
+        const snap = currentCanal;
         setTimeout(() => {
-            if (currentCanal === canalAlEsperar && !video.paused && player.isLive() && video.readyState < 3) {
-                console.warn("Forzando sincronización en vivo por congelamiento...");
-                const seekable = video.seekable;
-                if (seekable.length > 0) {
-                    video.currentTime = seekable.end(seekable.length - 1) - 1;
-                }
+            if (currentCanal === snap && !video.paused && video.readyState < 3) {
+                const s = video.seekable;
+                if (s.length > 0) video.currentTime = s.end(s.length - 1) - 1;
             }
         }, 5000);
     });
 
-    // Función separada para resetear el player cuando está corrupto
     async function resetPlayer() {
-        console.warn("Reseteando player por fallos acumulados...");
-        try {
-            await player.destroy();
-        } catch (e) {
-            console.log("Aviso al destruir player:", e);
-        }
+        try { await player.destroy(); } catch {}
         player = new shaka.Player();
         player.attach(video);
-        player.addEventListener("error", async (e) => {
-            console.error("Shaka error detectado:", e.detail);
-            if (e.detail && (e.detail.category === 1 || e.detail.category === 3)) {
-                try {
-                    await player.retry();
-                } catch {
-                    if (retryTimeout) clearTimeout(retryTimeout);
-                    if (currentCanal) {
-                        retryTimeout = setTimeout(() => playChannel(currentCanal, activeBtn), 3000);
-                    }
-                }
-            }
-        });
+        attachShakaErrorHandler(player);
         consecutiveFails = 0;
     }
 
+    // ── Reproducción con fallback nativo para Safari/Mac ──
     async function playChannel(canal, btnElement) {
-        if (retryTimeout) {
-            clearTimeout(retryTimeout);
-            retryTimeout = null;
-        }
-
+        if (retryTimeout) { clearTimeout(retryTimeout); retryTimeout = null; }
         if (activeBtn) activeBtn.classList.remove("activo");
-        if (btnElement) {
-            btnElement.classList.add("activo");
-            activeBtn = btnElement;
-        }
+        if (btnElement) { btnElement.classList.add("activo"); activeBtn = btnElement; }
 
         currentCanal = canal;
         document.getElementById("now-playing").textContent = "▶️ " + canal.name;
 
-        // Si hubo 2 o más fallos consecutivos, resetear el player antes de continuar
-        if (consecutiveFails >= 2) {
-            await resetPlayer();
+        const isHLS = canal.url && (canal.url.includes(".m3u8") || canal.type === "HLS");
+        const noClearKey = !canal.drm_license_uri || canal.drm_license_uri === "";
+        const useNative  = (isSafari || supportsHLS(video)) && isHLS && noClearKey;
+
+        if (useNative) {
+            // Safari: reproducción nativa directa, sin Shaka
+            try { await player.unload(); } catch {}
+            video.src = canal.url;
+            try { await video.play(); } catch {}
+            canal._retries = 0;
+            consecutiveFails = 0;
+            return;
         }
 
-        try {
-            await player.unload();
-        } catch (e) {
-            console.log("Aviso al descargar player:", e);
-        }
+        // Shaka para todo lo demás (DASH, CLEARKEY, HLS con headers, etc.)
+        if (consecutiveFails >= 2) await resetPlayer();
 
+        try { await player.unload(); } catch {}
         player.resetConfiguration();
         player.getNetworkingEngine().clearAllRequestFilters();
 
         if (canal.headers) {
             player.getNetworkingEngine().registerRequestFilter((type, request) => {
-                if (canal.headers.Origin) request.headers["Origin"] = canal.headers.Origin;
-                if (canal.headers.Referer) request.headers["Referer"] = canal.headers.Referer;
-                if (canal.headers["User-Agent"]) request.headers["User-Agent"] = canal.headers["User-Agent"];
+                const h = canal.headers;
+                if (h.Origin)        request.headers["Origin"]     = h.Origin;
+                if (h.Referer)       request.headers["Referer"]    = h.Referer;
+                if (h["User-Agent"]) request.headers["User-Agent"] = h["User-Agent"];
+                if (h.user_uuid)     request.headers["user_uuid"]  = h.user_uuid;
+                if (h["x-aws-server-site-by"]) request.headers["x-aws-server-site-by"] = h["x-aws-server-site-by"];
             });
         }
 
         let drmConfig = {};
         if (canal.drm_license_uri && canal.type === "CLEARKEY") {
             try {
-                const url = new URL(canal.drm_license_uri);
+                const url   = new URL(canal.drm_license_uri);
                 const keyId = url.searchParams.get("keyid");
-                const key = url.searchParams.get("key");
-                if (keyId && key) {
-                    drmConfig = { clearKeys: { [keyId]: key } };
-                } else {
-                    drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
-                }
-            } catch (e) {
+                const key   = url.searchParams.get("key");
+                drmConfig = (keyId && key)
+                    ? { clearKeys: { [keyId]: key } }
+                    : { servers: { "org.w3.clearkey": canal.drm_license_uri } };
+            } catch {
                 drmConfig = { servers: { "org.w3.clearkey": canal.drm_license_uri } };
             }
         }
@@ -169,16 +336,13 @@
 
         try {
             await player.load(canal.url);
-            document.getElementById("player-section").scrollIntoView({ behavior: 'smooth' });
-            canal._retries = 0;
-            consecutiveFails = 0; // Resetear contador al cargar exitosamente
+            canal._retries   = 0;
+            consecutiveFails = 0;
         } catch (e) {
             console.error("Error al cargar canal:", e);
-            consecutiveFails++; // Incrementar contador de fallos consecutivos
-
+            consecutiveFails++;
             if (currentCanal === canal) {
                 canal._retries = (canal._retries || 0) + 1;
-
                 if (canal._retries <= 3) {
                     document.getElementById("now-playing").textContent =
                         `❌ Reintentando (${canal._retries}/3): ` + canal.name;
@@ -194,57 +358,79 @@
         }
     }
 
-async function loadChannels() {
-  const controller = new AbortController();
-  const fetchTimeout = setTimeout(() => controller.abort(), 8000);
-  
-  try {
-    // Genera un número único basado en milisegundos idéntico al de archive.org
-    const cacheBuster = new Date().getTime();
-    const urlConNoCache = `${JSON_URL}?nocache=${cacheBuster}`;
+    // ── Renderizado de la lista ──
+    function renderList(data, filter = "") {
+        const list = document.getElementById("channel-list");
+        list.innerHTML = "";
+        const q = filter.toLowerCase().trim();
 
-    // Hacemos la petición con la URL modificada dinámicamente
-    const res = await fetch(urlConNoCache, { signal: controller.signal });
-    clearTimeout(fetchTimeout);
-    
-    if (!res.ok) throw new Error(`Código: ${res.status}`);
-    const data = await res.json();
-    const container = document.getElementById("container");
-    container.innerHTML = "";
-    
-    if (!Array.isArray(data)) throw new Error("Formato inválido.");
-    data.forEach(categoria => {
-      const catLabel = document.createElement("div");
-      catLabel.className = "categoria";
-      catLabel.textContent = "📌 " + categoria.name;
-      container.appendChild(catLabel);
-      
-      if (categoria.samples && Array.isArray(categoria.samples)) {
-        categoria.samples.forEach(canal => {
-          const btn = document.createElement("button");
-          btn.className = "canal-btn";
-          const img = document.createElement("img");
-          img.alt = canal.name;
-          if (canal.icono) {
-            img.src = canal.icono;
-            img.onerror = () => img.style.display = "none";
-          } else {
-            img.style.display = "none";
-          }
-          btn.appendChild(img);
-          btn.appendChild(document.createTextNode(canal.name));
-          btn.onclick = () => playChannel(canal, btn);
-          container.appendChild(btn);
+        data.forEach(categoria => {
+            const canales = (categoria.samples || []).filter(c =>
+                !q || c.name.toLowerCase().includes(q)
+            );
+            if (!canales.length) return;
+
+            const catLabel = document.createElement("div");
+            catLabel.className = "categoria";
+            catLabel.textContent = "📌 " + categoria.name;
+            list.appendChild(catLabel);
+
+            canales.forEach(canal => {
+                const btn = document.createElement("button");
+                btn.className = "canal-btn";
+                if (activeBtn && currentCanal === canal) btn.classList.add("activo");
+
+                const img = document.createElement("img");
+                img.alt = canal.name;
+                if (canal.icono) {
+                    img.src = canal.icono;
+                    img.onerror = () => { img.src = ""; img.style.display = "none"; };
+                } else {
+                    img.style.display = "none";
+                }
+
+                const nombre = document.createElement("span");
+                nombre.className = "canal-nombre";
+                nombre.textContent = canal.name;
+
+                btn.appendChild(img);
+                btn.appendChild(nombre);
+                btn.onclick = () => playChannel(canal, btn);
+                list.appendChild(btn);
+            });
         });
-      }
-    });
-  } catch (e) {
-    clearTimeout(fetchTimeout);
-    const msg = e.name === "AbortError" ? "Tiempo de espera agotado al cargar canales." : "Error cargando canales: " + e.message;
-    document.getElementById("container").textContent = msg;
-  }
-}
 
+        if (!list.children.length) {
+            list.textContent = q ? "Sin resultados para \"" + filter + "\"" : "Sin canales.";
+        }
+    }
+
+    // ── Carga inicial ──
+    async function loadChannels() {
+        const controller  = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 8000);
+        try {
+            const cacheBuster = Date.now();
+            const res  = await fetch(`${JSON_URL}?nocache=${cacheBuster}`, { signal: controller.signal });
+            clearTimeout(fetchTimeout);
+            if (!res.ok) throw new Error(`Código: \${res.status}`);
+            const data = await res.json();
+            if (!Array.isArray(data)) throw new Error("Formato inválido.");
+            allData = data;
+            renderList(allData);
+        } catch (e) {
+            clearTimeout(fetchTimeout);
+            const msg = e.name === "AbortError"
+                ? "Tiempo de espera agotado."
+                : "Error cargando canales: " + e.message;
+            document.getElementById("channel-list").textContent = msg;
+        }
+    }
+
+    // ── Buscador ──
+    document.getElementById("search-input").addEventListener("input", e => {
+        renderList(allData, e.target.value);
+    });
 
     loadChannels();
 </script>
