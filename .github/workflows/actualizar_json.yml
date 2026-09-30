@@ -1,14 +1,4 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# WORKFLOW COMPLETO PARA EL REPO PÚBLICO
-#
-# Descarga el JSON de mensajerofm, filtra solo los grupos deseados y lo
-# publica en la rama "puntoplay" de ESTE mismo repositorio (público).
-# Resultado accesible en:
-# https://raw.githubusercontent.com/cheroga/cheroga.github.io/refs/heads/puntoplay/canales.json
-# Se ejecuta MANUALMENTE o cada hora automáticamente.
-# ─────────────────────────────────────────────────────────────────────────────
-
-name: Play Premium  — canales (público-filtrado)
+name: Play Premium  — canales (filtrado)
 
 on:
   workflow_dispatch:
@@ -37,31 +27,49 @@ jobs:
           python3 - <<'PY'
           import json, urllib.request
 
-          UA     = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0 Safari/537.36"
-          SRC    = "https://mensajerofm.org/json/nocache_channel.json"
-          GRUPOS = {"EVENTOS PY"}
+          UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0 Safari/537.36"
 
-          req  = urllib.request.Request(SRC, headers={"User-Agent": UA})
-          data = json.loads(urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "replace"))
+          # ── Fuente 1 ──────────────────────────────────────────────────────
+          SRC1    = "https://mensajerofm.org/json/nocache_channel.json"
+          GRUPOS1 = {"EVENTOS PY"}
 
-          # Estructura: lista de objetos con "name" y "samples"
-          filtrado = [g for g in data if isinstance(g, dict) and g.get("name") in GRUPOS]
+          # ── Fuente 2 ──────────────────────────────────────────────────────
+          SRC2    = "https://mensajerofm.org/json/puntoplay_canales.json"
+          GRUPOS2 = {"⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO"}
+
+          def fetch(url):
+              req = urllib.request.Request(url, headers={"User-Agent": UA})
+              return json.loads(urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "replace"))
+
+          def filtrar(data, grupos, etiqueta):
+              resultado = [g for g in data if isinstance(g, dict) and g.get("name") in grupos]
+              print(f"\n📦 [{etiqueta}]")
+              print(f"   Grupos guardados: {len(resultado)}")
+              for g in resultado:
+                  print(f"   · {g['name']} — {len(g.get('samples', []))} canales")
+              encontrados = {g["name"] for g in resultado}
+              faltantes   = grupos - encontrados
+              if faltantes:
+                  print(f"   ⚠️  No encontrados: {faltantes}")
+                  print("   Grupos disponibles:")
+                  for g in data:
+                      if isinstance(g, dict) and "name" in g:
+                          print(f"     · {g['name']}")
+              return resultado
+
+          data1 = fetch(SRC1)
+          data2 = fetch(SRC2)
+
+          filtrado1 = filtrar(data1, GRUPOS1, "nocache_channel.json")
+          filtrado2 = filtrar(data2, GRUPOS2, "puntoplay_canales.json")
+
+          # ── Unir ambas listas en un solo array ────────────────────────────
+          final = filtrado1 + filtrado2
 
           with open("canales.json", "w", encoding="utf-8") as f:
-              json.dump(filtrado, f, ensure_ascii=False, indent=2)
+              json.dump(final, f, ensure_ascii=False, indent=2)
 
-          print(f"✅ Grupos guardados: {len(filtrado)}")
-          for g in filtrado:
-              print(f"   · {g['name']} — {len(g.get('samples', []))} canales")
-
-          if len(filtrado) < len(GRUPOS):
-              encontrados = {g["name"] for g in filtrado}
-              faltantes   = GRUPOS - encontrados
-              print(f"⚠️  No encontrados: {faltantes}")
-              print("   Grupos disponibles en la fuente:")
-              for g in data:
-                  if isinstance(g, dict) and "name" in g:
-                      print(f"     · {g['name']}")
+          print(f"\n✅ Total grupos en canales.json: {len(final)}")
           PY
 
       # 3. Publicar en la rama "puntoplay" (force push — solo la última versión)
