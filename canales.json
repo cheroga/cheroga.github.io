@@ -1,0 +1,166 @@
+[
+  {
+    "name": "EVENTOS PY",
+    "samples": [
+      {
+        "name": "EVENTOS 1 MPD FULL",
+        "url": "https://d3kzwqwnq1f7tq.cloudfront.net/out/v1/25ca218d53194065bedf6d998ace462e/index.mpd",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "type": "CLEARKEY",
+        "drm_license_uri": "https://results.femon.net/?keyid=1c62a216a5fe423f959cb1ca02f62d83&key=54f2fdc83c1da33cd9269bf21e08218c",
+        "headers": {
+          "Origin": "https://www.tigosports.com.py",
+          "Referer": "https://www.tigosports.com.py/",
+          "user_uuid": "1b65a320-aeed-11eb-ae01-d90082191a3c",
+          "x-aws-server-site-by": "PxxSaJhZU8NXOUBZyX6mU2xG49j8n8ekOf2cbIpf0hU=",
+          "User-Agent": "Mozilla/5.0"
+        }
+      },
+      {
+        "name": "EVENTOS 2 MPD FULL",
+        "url": "https://d3kzwqwnq1f7tq.cloudfront.net/out/v1/0fd608d0807c48edb4713da6b80e8c34/index_3.m3u8?z=b",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "headers": {
+          "Referer": "https://watch.fanatiz.com/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+        }
+      },
+      {
+        "name": "TIGO SPORTS 2",
+        "url": "https://d3kzwqwnq1f7tq.cloudfront.net/out/v1/0fd608d0807c48edb4713da6b80e8c34/index.m3u8",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png",
+        "headers": {
+          "Origin": "https://rumble.com",
+          "Referer": "https://rumble.com/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+        }
+      },
+      {
+        "name": "TIGO INTERMEDIA OPC1",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/sudhshdhsahd/playlist.m3u8",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png"
+      },
+      {
+        "name": "EVENTOS M3U8",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/gplaytv/playlist.m3u8",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg"
+      },
+      {
+        "name": "TIGO SPORTS EVENTOS OPC1",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/events1py/playlist.m3u8",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png"
+      },
+      {
+        "name": "TIGO SPORTS EVENTOS OPC2",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/events2py/playlist.m3u8",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png"
+      },
+      {
+        "name": "TIGO SPORTS EVENTOS OPC3",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/events3py/playlist.m3u8",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png"
+      },
+      {
+        "name": "EVENTOS M3U8 2",
+        "url": "http://45.170.130.224:8000/play/a04k",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "type": "HLS"
+      },
+      {
+        "name": "EVENTOS 2",
+        "url": "http://45.134.141.161:2200/ARG/Tigo_Sports/tracks-v1a1/mono.m3u8",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "headers": {
+          "Origin": "https://www.tigosports.com.py",
+          "Referer": "https://www.tigosports.com.py/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+        }
+      },
+      {
+        "name": "EVENTOS WEB 2",
+        "url": "https://streamxhd.com/live1.php?stream=tigo2",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "type": "WEBVIEW"
+      },
+      {
+        "name": "EVENTOS 1 WEB",
+        "url": "https://streamxhd.com/live1.php?stream=tigo1",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "type": "WEBVIEW"
+      },
+      {
+        "name": "EVENTOS 3",
+        "url": "https://stmv3.voxtvhd.com.br/toptop/toptop/playlist.m3u8",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg"
+      },
+      {
+        "name": "TIGO WEB PRUEBA",
+        "url": "https://streamx305.sbs/global1.php?channel=fanatiz1",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png",
+        "type": "WEBVIEW"
+      },
+      {
+        "name": "TIGO WEB PRUEBA 2",
+        "url": "https://streamx305.sbs/global1.php?channel=fanatiz3",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png",
+        "type": "WEBVIEW"
+      }
+    ]
+  },
+  {
+    "name": "⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO",
+    "samples": [
+      {
+        "name": "LANCE 1",
+        "url": "https://d3kzwqwnq1f7tq.cloudfront.net/out/v1/25ca218d53194065bedf6d998ace462e/index.mpd",
+        "type": "CLEARKEY",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png",
+        "drm_license_uri": "https://dl.dropboxusercontent.com/scl/fi/bify73qa6pam1h5op5mg4/tigo3.json?rlkey=r2r6qmvzobpn1tib3n068ap1z&st=2jfgsr87&dl=0"
+      },
+      {
+        "name": "LANCE 2",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/events1py/playlist.m3u8",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png"
+      },
+      {
+        "name": "LANCE 3",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/events2py/playlist.m3u8",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png"
+      },
+      {
+        "name": "LANCE 4",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/events3py/playlist.m3u8",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png"
+      },
+      {
+        "name": "LANCE 5",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/events1py/playlist.m3u8",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png"
+      },
+      {
+        "name": "LANCE 6",
+        "url": "https://api.tigosports.com.py/sls/v1/streaming/gJdVyMOXXrbimpT5ImB9h1g8?asset=rolling-buffer/APP_CHN1/APP_CHN1/transmux/index.mpd&typeContent=game",
+        "type": "CLEARKEY",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png",
+        "drm_license_uri": "https://dl.dropbox.com/scl/fi/wbw3yya7vk1f3ivn650ug/tigo4.txt?rlkey=ozbktawdgz3ir2ydtm4qez3om&st=8nrn8w9m&dl=0",
+        "headers": {
+          "Origin": "https://www.tigosports.com.py",
+          "Referer": "https://www.tigosports.com.py/",
+          "user_uuid": "1b65a320-aeed-11eb-ae01-d90082191a3c",
+          "x-aws-server-site-by": "PxxSaJhZU8NXOUBZyX6mU2xG49j8n8ekOf2cbIpf0hU=",
+          "User-Agent": "Mozilla/5.0"
+        }
+      },
+      {
+        "name": "LANCE 7",
+        "url": "https://lbgo.bozztv.com/ssh101/ssh101/gplaytv/playlist.m3u8",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png"
+      }
+    ]
+  }
+]
