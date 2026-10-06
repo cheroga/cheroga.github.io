@@ -16,37 +16,200 @@ jobs:
   canales:
     runs-on: ubuntu-latest
     steps:
-      # 1. Configurar Python
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 2. Bajar, filtrar y guardar canales
-      - name: Bajar y filtrar canales
+      - name: Bajar, normalizar y guardar canales
         run: |
           python3 - <<'PY'
-          import json, urllib.request
+          import json, urllib.request, base64
+          from urllib.parse import urlparse, parse_qs
 
           UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0 Safari/537.36"
 
-          # ── Fuente 1 ──────────────────────────────────────────────────────
+          # ── Fuentes ───────────────────────────────────────────────────────
           SRC1    = "https://mensajerofm.org/json/nocache_channel.json"
           GRUPOS1 = {"EVENTOS PY"}
 
-          # ── Fuente 2 ──────────────────────────────────────────────────────
           SRC2    = "https://mensajerofm.org/json/puntoplay_canales.json"
           GRUPOS2 = {"⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO"}
+
+          # ══════════════════════════════════════════════════════════════════
+          # HELPERS
+          # ══════════════════════════════════════════════════════════════════
 
           def fetch(url):
               req = urllib.request.Request(url, headers={"User-Agent": UA})
               return json.loads(urllib.request.urlopen(req, timeout=40).read().decode("utf-8", "replace"))
 
-          def filtrar(data, grupos, etiqueta):
-              resultado = [g for g in data if isinstance(g, dict) and g.get("name") in grupos]
+          def fetch_raw(url):
+              req = urllib.request.Request(url, headers={"User-Agent": UA})
+              return urllib.request.urlopen(req, timeout=12).read().decode("utf-8", "replace")
+
+          def base64url_to_hex(b64):
+              """Convierte base64url (con o sin padding) a hex string."""
+              padding = (4 - len(b64) % 4) % 4
+              b = base64.urlsafe_b64decode(b64 + "=" * padding)
+              return b.hex()
+
+          def formatear_uuid(hex_str):
+              """Formatea un hex de 32 chars al formato UUID con guiones."""
+              h = hex_str.replace("-", "").lower()
+              if len(h) != 32:
+                  return h
+              return f"{h[0:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:32]}"
+
+          def inferir_tipo(canal):
+              """Devuelve el type normalizado en mayúsculas, infiriéndolo si falta."""
+              t = canal.get("type", "").upper()
+              if t:
+                  return t
+              url = canal.get("url", "")
+              if ".mpd" in url:
+                  return "DASH"
+              if ".m3u8" in url or "/playlist" in url or "/mono" in url:
+                  return "HLS"
+              return "HLS"
+
+          def resolver_clearkey(canal):
+              """
+              Resuelve drm_license_uri en build-time y lo reemplaza por
+              drm_clearkey: { keyId, key } listo para Shaka.
+
+              Soporta 3 variantes:
+                A) ?keyid=HEX&key=HEX   — query params directos
+                B) JSON externo W3C      — {"keys":[{"kty":"oct","kid":"b64","k":"b64"}]}
+                C) TXT externo           — keyid=HEX\nkey=HEX  (una clave por línea)
+              """
+              uri = canal.get("drm_license_uri", "").strip()
+              if not uri:
+                  return canal
+
+              nombre = canal.get("name", "?")
+
+              # ── Variante A: query params ──────────────────────────────────
+              parsed = urlparse(uri)
+              params = parse_qs(parsed.query)
+              kid_raw = params.get("keyid", [""])[0]
+              key_raw = params.get("key",   [""])[0]
+
+              if kid_raw and key_raw:
+                  canal["drm_clearkey"] = {
+                      "keyId": formatear_uuid(kid_raw),
+                      "key":   key_raw.lower()
+                  }
+                  canal.pop("drm_license_uri", None)
+                  print(f"   🔑 [A] ClearKey resuelto (query params): {nombre}")
+                  return canal
+
+              # ── Variante B / C: archivo externo ───────────────────────────
+              try:
+                  raw = fetch_raw(uri)
+                  data = json.loads(raw)
+
+                  # Formato W3C ClearKey JSON
+                  if "keys" in data and isinstance(data["keys"], list) and data["keys"]:
+                      entry = data["keys"][0]
+                      kid_hex = base64url_to_hex(entry["kid"])
+                      key_hex = base64url_to_hex(entry["k"])
+                      canal["drm_clearkey"] = {
+                          "keyId": formatear_uuid(kid_hex),
+                          "key":   key_hex
+                      }
+                      canal.pop("drm_license_uri", None)
+                      print(f"   🔑 [B] ClearKey resuelto (JSON W3C): {nombre}")
+                      return canal
+
+                  # JSON con keyid/key planos
+                  if "keyid" in data and "key" in data:
+                      canal["drm_clearkey"] = {
+                          "keyId": formatear_uuid(data["keyid"]),
+                          "key":   data["key"].lower()
+                      }
+                      canal.pop("drm_license_uri", None)
+                      print(f"   🔑 [B2] ClearKey resuelto (JSON plano): {nombre}")
+                      return canal
+
+              except (json.JSONDecodeError, KeyError):
+                  # ── Variante C: TXT con keyid=HEX / key=HEX ──────────────
+                  try:
+                      lines = {
+                          k.strip(): v.strip()
+                          for line in raw.splitlines()
+                          if "=" in line
+                          for k, v in [line.split("=", 1)]
+                      }
+                      kid_txt = lines.get("keyid", lines.get("kid", ""))
+                      key_txt = lines.get("key",   lines.get("k",   ""))
+                      if kid_txt and key_txt:
+                          # Si viene en base64url, convertir
+                          try:
+                              kid_hex = base64url_to_hex(kid_txt) if len(kid_txt) < 32 else kid_txt
+                              key_hex = base64url_to_hex(key_txt) if len(key_txt) < 32 else key_txt
+                          except Exception:
+                              kid_hex, key_hex = kid_txt, key_txt
+                          canal["drm_clearkey"] = {
+                              "keyId": formatear_uuid(kid_hex),
+                              "key":   key_hex.lower()
+                          }
+                          canal.pop("drm_license_uri", None)
+                          print(f"   🔑 [C] ClearKey resuelto (TXT): {nombre}")
+                          return canal
+                  except Exception as e2:
+                      print(f"   ⚠️  Error parseando TXT para {nombre}: {e2}")
+
+              except Exception as e:
+                  print(f"   ⚠️  No se pudo resolver ClearKey para {nombre}: {e}")
+                  # Conservar drm_license_uri como fallback para el player
+              return canal
+
+          def normalizar_canal(canal):
+              """Aplica todas las normalizaciones a un canal individual."""
+
+              # 1. Tipo normalizado
+              canal["type"] = inferir_tipo(canal)
+
+              # 2. Resolver ClearKey en build-time
+              if canal["type"] == "CLEARKEY":
+                  canal = resolver_clearkey(canal)
+
+              # 3. Marcar WEBVIEW como no reproducible en el player
+              if canal["type"] == "WEBVIEW":
+                  canal["playable"] = False
+              else:
+                  canal["playable"] = True
+
+              # 4. Limpiar campos vacíos o nulos
+              canal = {k: v for k, v in canal.items() if v is not None and v != ""}
+
+              return canal
+
+          def filtrar_y_normalizar(data, grupos, etiqueta):
+              resultado = []
+              for g in data:
+                  if not isinstance(g, dict) or g.get("name") not in grupos:
+                      continue
+                  canales_norm = []
+                  for canal in g.get("samples", []):
+                      try:
+                          canales_norm.append(normalizar_canal(canal))
+                      except Exception as e:
+                          print(f"   ⚠️  Error normalizando {canal.get('name','?')}: {e}")
+                          canales_norm.append(canal)
+                  g["samples"] = canales_norm
+                  resultado.append(g)
+
               print(f"\n📦 [{etiqueta}]")
               print(f"   Grupos guardados: {len(resultado)}")
               for g in resultado:
-                  print(f"   · {g['name']} — {len(g.get('samples', []))} canales")
+                  total    = len(g.get("samples", []))
+                  webview  = sum(1 for c in g["samples"] if c.get("type") == "WEBVIEW")
+                  clearkey = sum(1 for c in g["samples"] if c.get("type") == "CLEARKEY")
+                  hls      = sum(1 for c in g["samples"] if c.get("type") == "HLS")
+                  dash     = sum(1 for c in g["samples"] if c.get("type") == "DASH")
+                  print(f"   · {g['name']} — {total} canales  [HLS:{hls} DASH:{dash} CLEARKEY:{clearkey} WEBVIEW:{webview}]")
+
               encontrados = {g["name"] for g in resultado}
               faltantes   = grupos - encontrados
               if faltantes:
@@ -55,24 +218,30 @@ jobs:
                   for g in data:
                       if isinstance(g, dict) and "name" in g:
                           print(f"     · {g['name']}")
+
               return resultado
 
+          # ══════════════════════════════════════════════════════════════════
+          # MAIN
+          # ══════════════════════════════════════════════════════════════════
+
+          print("⬇️  Descargando fuentes...")
           data1 = fetch(SRC1)
           data2 = fetch(SRC2)
 
-          filtrado1 = filtrar(data1, GRUPOS1, "nocache_channel.json")
-          filtrado2 = filtrar(data2, GRUPOS2, "puntoplay_canales.json")
+          print("\n🔧 Normalizando...")
+          filtrado1 = filtrar_y_normalizar(data1, GRUPOS1, "nocache_channel.json")
+          filtrado2 = filtrar_y_normalizar(data2, GRUPOS2, "puntoplay_canales.json")
 
-          # ── Unir ambas listas en un solo array ────────────────────────────
           final = filtrado1 + filtrado2
 
           with open("canales.json", "w", encoding="utf-8") as f:
               json.dump(final, f, ensure_ascii=False, indent=2)
 
-          print(f"\n✅ Total grupos en canales.json: {len(final)}")
+          total_canales = sum(len(g.get("samples", [])) for g in final)
+          print(f"\n✅ canales.json generado — {len(final)} grupos, {total_canales} canales totales")
           PY
 
-      # 3. Publicar en la rama "puntoplay" (force push — solo la última versión)
       - name: Publicar en rama puntoplay
         run: |
           set -e
