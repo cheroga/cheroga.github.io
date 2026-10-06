@@ -33,17 +33,17 @@ jobs:
           SRC_A   = "https://mensajerofm.org/v1/nocache_channel.json"
           GRUPOS_A = {
               "EVENTOS PY",
-              "?DEPORTES ESPN Y FOX SPORTS AR????"
+              "⚽DEPORTES ESPN Y FOX SPORTS AR🇦🇷"
           }
 
           SRC_B   = "https://mensajerofm.org/v1/puntoplay_canales.json"
-          GRUPOS_B = {"????? LANCE, SOLO EVENTOS EN VIVO"}
+          GRUPOS_B = {"⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO"}
 
           # -- Orden final de grupos en el JSON ------------------------------
           ORDEN_FINAL = [
               "EVENTOS PY",
-              "????? LANCE, SOLO EVENTOS EN VIVO",
-              "?DEPORTES ESPN Y FOX SPORTS AR????",
+              "⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO",
+              "⚽DEPORTES ESPN Y FOX SPORTS AR🇦🇷",
           ]
 
           # ------------------------------------------------------------------
