@@ -33,7 +33,7 @@ jobs:
           GRUPOS1 = {"EVENTOS PY"}
 
           SRC2    = "https://mensajerofm.org/v1/puntoplay_canales.json"
-          GRUPOS2 = {"????? LANCE, SOLO EVENTOS EN VIVO"}
+          GRUPOS2 = {"⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO"}
 
           # ------------------------------------------------------------------
           # HELPERS
