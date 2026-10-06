@@ -413,7 +413,7 @@
             const cacheBuster = Date.now();
             const res  = await fetch(`${JSON_URL}?nocache=${cacheBuster}`, { signal: controller.signal });
             clearTimeout(fetchTimeout);
-            if (!res.ok) throw new Error(`Código: \${res.status}`);
+            if (!res.ok) throw new Error(`Código: ${res.status}`);
             const data = await res.json();
             if (!Array.isArray(data)) throw new Error("Formato inválido.");
             allData = data;
