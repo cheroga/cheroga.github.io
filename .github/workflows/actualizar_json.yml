@@ -29,10 +29,10 @@ jobs:
           UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0 Safari/537.36"
 
           # -- Fuentes -------------------------------------------------------
-          SRC1    = "https://mensajerofm.org/json/nocache_channel.json"
+          SRC1    = "https://mensajerofm.org/v1/nocache_channel.json"
           GRUPOS1 = {"EVENTOS PY"}
 
-          SRC2    = "https://mensajerofm.org/json/puntoplay_canales.json"
+          SRC2    = "https://mensajerofm.org/v1/puntoplay_canales.json"
           GRUPOS2 = {"????? LANCE, SOLO EVENTOS EN VIVO"}
 
           # ------------------------------------------------------------------
