@@ -436,16 +436,25 @@ async function playChannel(canal, btnElement) {
     if (btnElement) { btnElement.classList.add("activo"); activeBtn = btnElement; }
     currentCanal = canal;
 
-    // -- WEBVIEW: no reproducible --
+    // ── WEBVIEW: no reproducible ──
     if (!canal.playable || canal.type === "WEBVIEW") {
         showWebviewOverlay(canal);
-        setNowPlaying("?? " + canal.name);
+        setNowPlaying("🌐 " + canal.name);
         showSpinner(false);
         return;
     }
 
+    // ── TOKEN BOUND: URL con sesión/IP fija, no reproducible externamente ──
+    if (canal.token_bound) {
+        setNowPlaying("⚠️ " + canal.name + " — URL con sesión expirada");
+        showSpinner(false);
+        if (activeBtn) activeBtn.classList.remove("activo");
+        activeBtn = null;
+        return;
+    }
+
     hideWebviewOverlay();
-    setNowPlaying("? " + canal.name);
+    setNowPlaying("⏳ " + canal.name);
     showSpinner(true);
 
     const isHLS      = canal.type === "HLS";
