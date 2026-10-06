@@ -32,8 +32,7 @@ jobs:
           # SRC1 y SRC3 comparten la misma URL ? se fetchea una sola vez
           SRC_A   = "https://mensajerofm.org/v1/nocache_channel.json"
           GRUPOS_A = {
-              "EVENTOS PY",
-              "⚽DEPORTES ESPN Y FOX SPORTS AR🇦🇷"
+              "EVENTOS PY"
           }
 
           SRC_B   = "https://mensajerofm.org/v1/puntoplay_canales.json"
@@ -43,7 +42,6 @@ jobs:
           ORDEN_FINAL = [
               "EVENTOS PY",
               "⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO",
-              "⚽DEPORTES ESPN Y FOX SPORTS AR🇦🇷",
           ]
 
           # ------------------------------------------------------------------
