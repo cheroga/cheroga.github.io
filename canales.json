@@ -1,0 +1,97 @@
+[
+  {
+    "name": "EVENTOS PY",
+    "samples": [
+      {
+        "name": "TIGO SPORTS 2",
+        "url": "https://d3kzwqwnq1f7tq.cloudfront.net/out/v1/0fd608d0807c48edb4713da6b80e8c34/index.m3u8?&z=a",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png",
+        "headers": {
+          "Origin": "https://www.tigosports.com.py",
+          "Referer": "https://www.tigosports.com.py/",
+          "user_uuid": "1b65a320-aeed-11eb-ae01-d90082191a3c",
+          "x-aws-server-site-by": "PxxSaJhZU8NXOUBZyX6mU2xG49j8n8ekOf2cbIpf0hU=",
+          "User-Agent": "Mozilla/5.0"
+        },
+        "type": "HLS",
+        "playable": true
+      },
+      {
+        "name": "TIGO GOLD",
+        "url": "http://45.177.206.26:9000/live/canal17.flv",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png",
+        "type": "HLS",
+        "playable": true
+      },
+      {
+        "name": "TIGO SPORTS EVENTOS OPC1",
+        "url": "https://prod-fastly-a.video.pscp.tv/Transcoding/v1/hls/2YRzpagePldPEJ/non_transcode/atla/x-media-live-stream-atla/master_dynamic_delta.m3u8?type=live",
+        "icono": "https://i.ibb.co/M5jGk5dC/unnamed.png",
+        "headers": {
+          "Origin": "https://studio.x.com",
+          "Referer": "https://studio.x.com/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+        },
+        "type": "HLS",
+        "playable": true
+      },
+      {
+        "name": "EVENTOS M3U8 2",
+        "url": "https://hugh.cdn.rumble.cloud/live/3fms19g4/live-hls/i01q-8nlo/chunklist_i1_DVR.m3u8",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "type": "HLS",
+        "playable": true
+      },
+      {
+        "name": "EVENTOS 3",
+        "url": "https://stmv3.voxtvhd.com.br/toptop/toptop/playlist.m3u8",
+        "icono": "https://i.postimg.cc/VvVnM76s/photo-4974733346650917875-y.jpg",
+        "type": "HLS",
+        "playable": true
+      }
+    ]
+  },
+  {
+    "name": "⚽🇵🇾 LANCE, SOLO EVENTOS EN VIVO",
+    "samples": [
+      {
+        "url": "https://d3kzwqwnq1f7tq.cloudfront.net/out/v1/0fd608d0807c48edb4713da6b80e8c34/index.m3u8",
+        "name": "LANCE",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/d0w3vdNf/LANCE.png",
+        "playable": true
+      },
+      {
+        "url": "https://prod-fastly-a.video.pscp.tv/Transcoding/v1/hls/2YRzpagePldPEJ/non_transcode/atla/x-media-live-stream-atla/master_dynamic_delta.m3u8?type=live",
+        "name": "LANCE 1",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/Xfd6tQRk/Bal-n-Trionda-bajo-la-bandera-paraguaya.png",
+        "headers": {
+          "Origin": "https://studio.x.com/",
+          "Referer": "https://studio.x.com/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+        },
+        "playable": true
+      },
+      {
+        "url": "https://183.giatvcdn.com/ssh101/ssh101/pycanal/playlist.m3u8",
+        "name": "LANCE 2",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/Xfd6tQRk/Bal-n-Trionda-bajo-la-bandera-paraguaya.png",
+        "playable": true
+      },
+      {
+        "url": "https://prod-fastly-a.video.pscp.tv/Transcoding/v1/hls/2brBkzPyKvjkzB/non_transcode/atla/x-media-live-stream-atla/master_dynamic_delta.m3u8?type=live",
+        "name": "LANCE 3",
+        "type": "HLS",
+        "icono": "https://i.ibb.co/Xfd6tQRk/Bal-n-Trionda-bajo-la-bandera-paraguaya.png",
+        "headers": {
+          "Origin": "https://studio.x.com/",
+          "Referer": "https://studio.x.com/",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36"
+        },
+        "playable": true
+      }
+    ]
+  }
+]
